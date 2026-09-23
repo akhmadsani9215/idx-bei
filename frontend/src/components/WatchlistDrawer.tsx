@@ -113,7 +113,7 @@ export const WatchlistDrawer: React.FC<WatchlistDrawerProps> = ({
               <Star size={36} style={{ margin: '0 auto 0.75rem', opacity: 0.3 }} />
               <h4 style={{ margin: '0 0 0.5rem', color: '#f8fafc' }}>Your Watchlist is Empty</h4>
               <p style={{ fontSize: '0.85rem', margin: 0, lineHeight: 1.5 }}>
-                Click the star icon ⭐ on any stock in Alpha Finder to track and receive smart money alerts.
+                Click the star icon ⭐ on any stock in Alpha Finder to track and receive watchlist alerts.
               </p>
             </div>
           ) : (
@@ -191,7 +191,7 @@ export const WatchlistDrawer: React.FC<WatchlistDrawerProps> = ({
               <Bell size={36} style={{ margin: '0 auto 0.75rem', opacity: 0.3 }} />
               <h4 style={{ margin: '0 0 0.5rem', color: '#f8fafc' }}>No Live Alerts</h4>
               <p style={{ fontSize: '0.85rem', margin: 0, lineHeight: 1.5 }}>
-                Real-time stealth accumulation and retail trap signals will stream here automatically.
+                Watchlist alerts will appear here. Broker-attribution stealth/retail-trap signals are currently unavailable.
               </p>
             </div>
           ) : (

@@ -14,6 +14,8 @@ from idx.core.utils import DATA_DIR, get_logger
 log = get_logger("idx.core.ownership")
 
 DEFAULT_OWNERSHIP_CSV = os.path.join(DATA_DIR, "1%ownership-2026-02-27.csv")
+# Local sample/fallback path only — NOT a production KSEI URL.
+# Production status: KSEI OWNERSHIP SOURCE NOT CONFIGURED (operator must supply path_or_url).
 
 NOTABLE_TYCOONS = {
     "LO KHENG HONG": "Lo Kheng Hong",

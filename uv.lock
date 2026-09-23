@@ -627,6 +627,10 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "tqdm" },
     { name = "uvicorn" },
+]
+
+[package.optional-dependencies]
+fx-yahoo = [
     { name = "yfinance" },
 ]
 
@@ -639,6 +643,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "ruff" },
+    { name = "yfinance" },
 ]
 
 [package.metadata]
@@ -651,8 +656,9 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.0.1" },
     { name = "tqdm", specifier = ">=4.67.1" },
     { name = "uvicorn", specifier = ">=0.30.0" },
-    { name = "yfinance", specifier = ">=0.2.59" },
+    { name = "yfinance", marker = "extra == 'fx-yahoo'", specifier = ">=0.2.59" },
 ]
+provides-extras = ["fx-yahoo"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -663,6 +669,7 @@ dev = [
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-cov", specifier = ">=6.0.0" },
     { name = "ruff", specifier = ">=0.8.0" },
+    { name = "yfinance", specifier = ">=0.2.59" },
 ]
 
 [[package]]
@@ -1261,7 +1268,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "ptyprocess" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [

@@ -12,6 +12,68 @@ interface DividendTabProps {
   onSelectStock: (ticker: string) => void;
 }
 
+function fmtDash(value: unknown, suffix = ''): string {
+  if (value === null || value === undefined || value === '') return '—';
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return '—';
+  return `${n}${suffix}`;
+}
+
+function normalizeDividendAnalysis(raw: any): DividendAnalysis | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const trap =
+    raw.dividend_trap_score ?? raw.trap_score ?? null;
+  const trapN = trap == null ? null : Number(trap);
+  const dpr = raw.fundamentals?.dpr_pct ?? raw.metrics?.payout_ratio ?? null;
+  const dprN = dpr == null ? null : Number(dpr);
+  return {
+    ticker: String(raw.ticker || ''),
+    has_dividend: Boolean(raw.has_dividend),
+    message: raw.message,
+    dividend: raw.dps_idr != null
+      ? {
+          dps: Number(raw.dps_idr),
+          yield_pct: Number(raw.dividend_yield_pct),
+          cum_date: raw.dates?.cum_date || '—',
+          ex_date: raw.dates?.ex_date || '—',
+          payment_date: raw.dates?.payment_date || '—',
+        }
+      : raw.dividend,
+    metrics: {
+      payout_ratio: Number.isFinite(dprN as number) ? (dprN as number) : undefined,
+      cash_coverage: undefined,
+      fcf_yield: undefined,
+      earnings_growth_yoy: undefined,
+      ...(raw.metrics || {}),
+      ...(raw.fundamentals
+        ? {
+            per: raw.fundamentals.per,
+            pbv: raw.fundamentals.pbv,
+            roe_pct: raw.fundamentals.roe_pct,
+            der: raw.fundamentals.der,
+          }
+        : {}),
+    },
+    trap_score: Number.isFinite(trapN as number) ? (trapN as number) : undefined,
+    trap_level: raw.dividend_trap_tier || raw.trap_level || undefined,
+    recommendation: raw.verdict || raw.recommendation || undefined,
+    playbook: raw.playbook,
+    risk_breakdown: raw.risk_breakdown,
+    // Pass-through for honest display of API-native fields
+    ...({
+      dividend_trap_score: raw.dividend_trap_score,
+      dividend_trap_tier: raw.dividend_trap_tier,
+      fundamentals: raw.fundamentals,
+      foreign_flow: raw.foreign_flow,
+      tactical_action: raw.tactical_action,
+      current_price: raw.current_price,
+      dividend_yield_pct: raw.dividend_yield_pct,
+      dates: raw.dates,
+      usd_idr: raw.usd_idr,
+    } as any),
+  };
+}
+
 export const DividendTab: React.FC<DividendTabProps> = ({ onSelectStock }) => {
   const [opportunities, setOpportunities] = useState<DividendOpportunity[]>([]);
   const [selectedTicker, setSelectedTicker] = useState<string>('BBCA');
@@ -26,19 +88,28 @@ export const DividendTab: React.FC<DividendTabProps> = ({ onSelectStock }) => {
     setLoadingList(true);
     try {
       const data = await fetchDividendScreen(minYield);
-      // Map records to DividendOpportunity format
-      const formatted: DividendOpportunity[] = (data || []).map((d: any) => ({
-        StockCode: d.Ticker || d.code || d.StockCode || d.ticker || '',
-        StockName: d.Name || d.name || d.StockName || '',
-        DPS: Number(d.DPS_IDR ?? d.dps ?? d.DPS ?? 0),
-        DividendYield: Number(d['Yield%'] ?? d.yield ?? d.DividendYield ?? 0),
-        CumDate: d.CumDate || d.cum_date || '—',
-        ExDate: d.ExDate || d.ex_date || '—',
-        PaymentDate: d.PaymentDate || d.payment_date || '—',
-        PayoutRatio: Number(d['DPR%'] ?? d.payout_ratio ?? d.PayoutRatio ?? 0),
-        TrapScore: Number(d.TrapScore ?? d.trap_score ?? 0),
-        Recommendation: d.Verdict || d.recommendation || 'NEUTRAL',
-      }));
+      const formatted: DividendOpportunity[] = (data || []).map((d: any) => {
+        const trapRaw = d.TrapScore ?? d.trap_score ?? d.dividend_trap_score;
+        const trapN = trapRaw == null || trapRaw === '' ? null : Number(trapRaw);
+        const yldRaw = d['Yield%'] ?? d.yield ?? d.DividendYield ?? d.dividend_yield_pct;
+        const yldN = yldRaw == null || yldRaw === '' ? null : Number(yldRaw);
+        const dpsRaw = d.DPS_IDR ?? d.dps ?? d.DPS ?? d.dps_idr;
+        const dpsN = dpsRaw == null || dpsRaw === '' ? null : Number(dpsRaw);
+        const payoutRaw = d['DPR%'] ?? d.payout_ratio ?? d.PayoutRatio ?? d.dpr_pct;
+        const payoutN = payoutRaw == null || payoutRaw === '' ? null : Number(payoutRaw);
+        return {
+          StockCode: d.Ticker || d.code || d.StockCode || d.ticker || '',
+          StockName: d.Name || d.name || d.StockName || '',
+          DPS: Number.isFinite(dpsN as number) ? (dpsN as number) : 0,
+          DividendYield: Number.isFinite(yldN as number) ? (yldN as number) : 0,
+          CumDate: d.CumDate || d.cum_date || '—',
+          ExDate: d.ExDate || d.ex_date || '—',
+          PaymentDate: d.PaymentDate || d.payment_date || '—',
+          PayoutRatio: Number.isFinite(payoutN as number) ? (payoutN as number) : undefined,
+          TrapScore: Number.isFinite(trapN as number) ? (trapN as number) : undefined,
+          Recommendation: d.Verdict || d.recommendation || d.verdict || undefined,
+        };
+      });
       setOpportunities(formatted);
       if (formatted.length > 0 && !formatted.some(f => f.StockCode === selectedTicker)) {
         setSelectedTicker(formatted[0].StockCode);
@@ -63,9 +134,9 @@ export const DividendTab: React.FC<DividendTabProps> = ({ onSelectStock }) => {
     setLoadingDetail(true);
     try {
       const res = await fetchDividendAnalysis(ticker);
-      setAnalysis(res);
+      setAnalysis(normalizeDividendAnalysis(res));
     } catch (err: any) {
-      console.warn('Could not load deep dividend analysis for', ticker, err);
+      setError(err.message || `Failed to load analysis for ${ticker}`);
       setAnalysis(null);
     } finally {
       setLoadingDetail(false);
@@ -101,7 +172,7 @@ export const DividendTab: React.FC<DividendTabProps> = ({ onSelectStock }) => {
             <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 700 }}>Dividend Decision & Trap Radar</h2>
           </div>
           <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            Screen institutional dividend yields, evaluate Dividend Trap Risk (0–100), and test Cum/Ex-date arbitrage playbooks.
+            Screen dividend yields, evaluate Dividend Trap Risk (0–100), and test Cum/Ex-date arbitrage playbooks.
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -206,11 +277,21 @@ export const DividendTab: React.FC<DividendTabProps> = ({ onSelectStock }) => {
                   {filteredOpportunities.map((opp) => {
                     const isSelected = opp.StockCode === selectedTicker;
                     const trapColor =
-                      opp.TrapScore && opp.TrapScore > 60
+                      opp.TrapScore == null
+                        ? '#94a3b8'
+                        : opp.TrapScore > 60
                         ? '#ef4444'
-                        : opp.TrapScore && opp.TrapScore > 35
+                        : opp.TrapScore > 35
                         ? '#f59e0b'
                         : '#10b981';
+                    const trapLabel =
+                      opp.TrapScore == null
+                        ? 'UNAVAILABLE'
+                        : opp.TrapScore > 60
+                        ? 'HIGH RISK'
+                        : opp.TrapScore > 35
+                        ? 'MODERATE'
+                        : 'SAFE';
                     return (
                       <tr
                         key={opp.StockCode}
@@ -248,7 +329,8 @@ export const DividendTab: React.FC<DividendTabProps> = ({ onSelectStock }) => {
                             background: `${trapColor}20`,
                             border: `1px solid ${trapColor}40`,
                           }}>
-                            {opp.TrapScore && opp.TrapScore > 60 ? 'HIGH RISK' : opp.TrapScore && opp.TrapScore > 35 ? 'MODERATE' : 'SAFE'} ({opp.TrapScore ?? 25})
+                            {trapLabel}
+                            {opp.TrapScore != null ? ` (${opp.TrapScore})` : ''}
                           </span>
                         </td>
                         <td style={{ padding: '0.85rem 0.5rem', textAlign: 'right' }}>
@@ -261,7 +343,7 @@ export const DividendTab: React.FC<DividendTabProps> = ({ onSelectStock }) => {
                             color: '#38bdf8',
                             border: '1px solid rgba(56, 189, 248, 0.3)',
                           }}>
-                            {opp.Recommendation}
+                            {opp.Recommendation || '—'}
                           </span>
                         </td>
                       </tr>
@@ -317,79 +399,114 @@ export const DividendTab: React.FC<DividendTabProps> = ({ onSelectStock }) => {
               </div>
             ) : analysis ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {analysis.message && !analysis.trap_score && !(analysis as any).dividend_trap_score && (
+                  <p style={{ margin: 0, color: '#fbbf24', fontSize: '0.85rem' }}>{analysis.message}</p>
+                )}
                 {/* Trap Risk Score Hero */}
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   padding: '1rem 1.25rem',
-                  background: (analysis.trap_score ?? 0) > 60 ? 'rgba(239, 68, 68, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                  border: `1px solid ${(analysis.trap_score ?? 0) > 60 ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
+                  background:
+                    analysis.trap_score == null
+                      ? 'rgba(148, 163, 184, 0.08)'
+                      : analysis.trap_score > 60
+                        ? 'rgba(239, 68, 68, 0.1)'
+                        : 'rgba(16, 185, 129, 0.1)',
+                  border: `1px solid ${
+                    analysis.trap_score == null
+                      ? 'rgba(148, 163, 184, 0.3)'
+                      : analysis.trap_score > 60
+                        ? 'rgba(239, 68, 68, 0.3)'
+                        : 'rgba(16, 185, 129, 0.3)'
+                  }`,
                   borderRadius: '12px',
                 }}>
                   <div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Dividend Trap Risk Score</div>
-                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: (analysis.trap_score ?? 0) > 60 ? '#ef4444' : '#10b981' }}>
-                      {analysis.trap_score ?? 20} / 100
+                    <div style={{
+                      fontSize: '1.8rem',
+                      fontWeight: 800,
+                      color:
+                        analysis.trap_score == null
+                          ? '#94a3b8'
+                          : analysis.trap_score > 60
+                            ? '#ef4444'
+                            : '#10b981',
+                    }}>
+                      {analysis.trap_score != null ? `${analysis.trap_score} / 100` : '—'}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Status Level</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: (analysis.trap_score ?? 0) > 60 ? '#ef4444' : '#10b981' }}>
-                      {analysis.trap_level || 'LOW RISK'}
+                    <div style={{
+                      fontSize: '1.1rem',
+                      fontWeight: 700,
+                      color:
+                        analysis.trap_score == null
+                          ? '#94a3b8'
+                          : analysis.trap_score > 60
+                            ? '#ef4444'
+                            : '#10b981',
+                    }}>
+                      {analysis.trap_level || 'UNAVAILABLE'}
                     </div>
                   </div>
                 </div>
 
-                {/* 4 Pillars Grid */}
+                {/* Fundamentals from API — never invent demo numbers */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '0.85rem', borderRadius: '10px' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Payout Ratio</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Payout Ratio (DPR)</span>
                     <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '0.2rem' }}>
-                      {analysis.metrics?.payout_ratio ? `${analysis.metrics.payout_ratio.toFixed(1)}%` : '42.5%'}
+                      {analysis.metrics?.payout_ratio != null
+                        ? `${Number(analysis.metrics.payout_ratio).toFixed(1)}%`
+                        : '—'}
                     </div>
                   </div>
                   <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '0.85rem', borderRadius: '10px' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Cash Coverage</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Dividend Yield</span>
                     <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '0.2rem' }}>
-                      {analysis.metrics?.cash_coverage ? `${analysis.metrics.cash_coverage.toFixed(1)}x` : '2.8x'}
+                      {analysis.dividend?.yield_pct != null
+                        ? `${Number(analysis.dividend.yield_pct).toFixed(2)}%`
+                        : fmtDash((analysis as any).dividend_yield_pct, '%')}
                     </div>
                   </div>
                   <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '0.85rem', borderRadius: '10px' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>FCF Yield</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>ROE</span>
                     <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '0.2rem' }}>
-                      {analysis.metrics?.fcf_yield ? `${analysis.metrics.fcf_yield.toFixed(1)}%` : '6.4%'}
+                      {(analysis as any).fundamentals?.roe_pct != null
+                        ? `${Number((analysis as any).fundamentals.roe_pct).toFixed(1)}%`
+                        : '—'}
                     </div>
                   </div>
                   <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '0.85rem', borderRadius: '10px' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>YoY Growth</span>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '0.2rem', color: '#10b981' }}>
-                      {analysis.metrics?.earnings_growth_yoy ? `+${analysis.metrics.earnings_growth_yoy.toFixed(1)}%` : '+14.2%'}
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>PER / PBV</span>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, marginTop: '0.2rem' }}>
+                      {(analysis as any).fundamentals?.per != null || (analysis as any).fundamentals?.pbv != null
+                        ? `${(analysis as any).fundamentals?.per ?? '—'} / ${(analysis as any).fundamentals?.pbv ?? '—'}`
+                        : '—'}
                     </div>
                   </div>
                 </div>
 
-                {/* Arbitrage Strategy Comparison */}
+                {(analysis as any).tactical_action && (
+                  <p style={{ margin: 0, fontSize: '0.82rem', color: '#cbd5e1', lineHeight: 1.5 }}>
+                    {(analysis as any).tactical_action}
+                  </p>
+                )}
+
+                {/* Arbitrage note — no fabricated strategy winner */}
                 <div style={{
                   borderTop: '1px solid rgba(255, 255, 255, 0.08)',
                   paddingTop: '1rem',
                 }}>
                   <h4 style={{ margin: '0 0 0.75rem', fontSize: '0.95rem', fontWeight: 700 }}>
-                    3-Way Arbitrage Playbook
+                    Verdict
                   </h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.8rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px' }}>
-                      <span>Strategy A (Naive Hold & Collect)</span>
-                      <strong style={{ color: '#9ca3af' }}>Baseline</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '6px' }}>
-                      <span>Strategy B (Pre-Cum Exit - Dodge Ex-Date)</span>
-                      <strong style={{ color: '#10b981' }}>Recommended</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '6px' }}>
-                      <span>Strategy C (Post-Ex Panic Rebuy)</span>
-                      <strong style={{ color: '#38bdf8' }}>Selective</strong>
-                    </div>
+                  <div style={{ fontSize: '0.85rem', color: '#e2e8f0' }}>
+                    {analysis.recommendation || 'UNAVAILABLE'}
                   </div>
                   <button
                     onClick={() => {

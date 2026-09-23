@@ -2,7 +2,9 @@ export type TabType =
   | 'opportunities'
   | 'terminal'
   | 'power_map'
+  | 'big_money'
   | 'simulator'
+  | 'trading_plan'
   | 'ingestion';
 
 export interface DatasetTimeseriesMeta {
@@ -37,7 +39,19 @@ export interface IngestionInventory {
     files: Array<{ file: string; size_mb: number; modified_iso: string | null }>;
   };
   system: {
-    usd_idr: { rate: number; last_updated: string | null };
+    usd_idr: {
+      rate: number | null;
+      last_updated: string | null;
+      status?: string;
+      source?: string;
+      quality?: string;
+      confidence?: number | null;
+      is_live?: boolean;
+      is_market_quote?: boolean;
+      is_default_constant?: boolean;
+      is_verified_fx?: boolean;
+      notes?: string;
+    };
   };
 }
 
@@ -79,13 +93,98 @@ export interface BackfillRecommendations {
   tiers: BackfillTier[];
 }
 
+export type FreshnessStatus =
+  | 'current'
+  | 'screener_stale'
+  | 'screener_missing'
+  | 'unknown';
+
+export interface FreshnessContract {
+  last_successful_ingestion: {
+    available: boolean;
+    job_id: string | null;
+    job_type: string | null;
+    completed_at: string | null;
+    source: string | null;
+    note: string | null;
+  };
+  market_data: {
+    as_of_date: string | null;
+    partitions: Record<
+      string,
+      {
+        end_date: string | null;
+        start_date: string | null;
+        total_dates: number;
+      }
+    >;
+    parquet_modified_iso: Record<string, string | null>;
+  };
+  screener_snapshot: {
+    file: string;
+    exists: boolean;
+    modified_iso: string | null;
+    content_last_updated: string | null;
+  };
+  status: FreshnessStatus;
+  screener_lagging: boolean;
+  warning: string | null;
+  comparison_basis: string | null;
+  ingestion_evidence_at: string | null;
+  ingestion_evidence_source: string | null;
+}
+
 export interface IngestionStatusResponse {
   status: 'healthy' | 'warning' | 'critical';
   health_score: number;
   inventory: IngestionInventory;
   gaps: CalendarGapInfo;
   recommendations: BackfillRecommendations;
+  freshness?: FreshnessContract;
+  orchestration?: OrchestrationStatus;
   generated_at: string;
+}
+
+export type PipelineRunStatus =
+  | 'SUCCESS'
+  | 'PARTIAL'
+  | 'FAILED'
+  | 'UNAVAILABLE'
+  | 'IDLE'
+  | 'PENDING'
+  | 'RUNNING';
+
+export interface OrchestrationPipeline {
+  id: string;
+  label: string;
+  availability: 'AVAILABLE' | 'PARTIAL' | 'UNAVAILABLE';
+  status: PipelineRunStatus | string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  duration_sec?: number | null;
+  records?: number | null;
+  source?: string | null;
+  quality?: string | number | null;
+  warnings?: string[];
+  errors?: string[];
+  notes?: string | null;
+}
+
+export interface OrchestrationStatus {
+  integrations: {
+    realtime?: string;
+    ai?: string;
+    telegram?: string;
+    payment?: string;
+  };
+  pipelines: OrchestrationPipeline[];
+  last_sync_all?: {
+    overall_status?: string;
+    started_at?: string | null;
+    completed_at?: string | null;
+    duration_sec?: number | null;
+    pipelines?: OrchestrationPipeline[];
+  } | null;
 }
 
 export interface ScoreBreakdown {
@@ -127,11 +226,19 @@ export interface Company {
   npm?: number | null;
   de_ratio?: number | null;
   per?: number | null;
+  /** Canonical price-to-book from screener producer. */
   price_bv?: number | null;
+  /** Legacy alias of `price_bv`. */
   pbv?: number | null;
-  price?: number;
-  daily_change?: number;
-  previous_price?: number;
+  /** Legacy alias of `close`. Prefer `close`. */
+  price?: number | null;
+  /** Canonical last close from screener producer. */
+  close?: number | null;
+  daily_change?: number | null;
+  daily_change_pct?: number | null;
+  previous_price?: number | null;
+  /** Market/data date for screener price fields (not browser clock). */
+  price_date?: string | null;
   dps?: number | null;
   yield?: number | null;
   score: ScoreBreakdown;
@@ -141,7 +248,10 @@ export interface Company {
   shareholders?: Shareholder[];
   subsidiaries?: Subsidiary[];
   shared_directors?: any[];
-  market_cap?: number;
+  /** Canonical market-cap field from screener producer (Rp bn estimate). */
+  estimated_mcap?: number | null;
+  /** Legacy alias — prefer `estimated_mcap`. */
+  market_cap?: number | null;
   is_blue_chip?: boolean;
   conglomerate?: string | null;
 }
@@ -187,6 +297,8 @@ export interface DashboardData {
   companies: Company[];
   super_insiders: SuperInsider[];
   conglomerates: Conglomerate[];
+  /** Screener snapshot generation timestamp from network_alpha_data.json (data age, not live). */
+  last_updated?: string | null;
 }
 
 export interface StreamEvent {
@@ -220,16 +332,21 @@ export interface BacktestParams {
 
 export interface BacktestMetrics {
   total_return_pct: number;
-  cagr_pct?: number;
-  sharpe_ratio: number;
-  sortino_ratio: number;
-  max_drawdown_pct: number;
-  win_rate_pct: number;
-  profit_factor?: number;
+  /** Always null/unavailable — never treat as CAGR or mirror of total_return_pct. */
+  cagr_pct?: number | null;
+  sharpe_ratio: number | null;
+  sortino_ratio: number | null;
+  max_drawdown_pct: number | null;
+  win_rate_pct: number | null;
+  profit_factor?: number | null;
   total_trades: number;
-  avg_trade_return_pct: number;
-  benchmark_return_pct: number;
-  alpha_pct: number;
+  /** Number of trade rows included in the API payload (may be truncated). */
+  trades_returned?: number;
+  avg_trade_return_pct: number | null;
+  /** Null when no benchmark series was provided to the engine. */
+  benchmark_return_pct: number | null;
+  /** Null when no benchmark series was provided to the engine. */
+  alpha_pct: number | null;
   strategy?: string;
   holding_days?: number;
   position_sizing?: string;
@@ -278,18 +395,19 @@ export interface StealthAnomaly {
 }
 
 export interface StealthAccumulationSummary {
-  on_date: string;
-  smart_money_turnover_rp_b: number;
-  retail_turnover_rp_b: number;
-  smart_money_delta: number;
+  on_date: string | null;
+  smart_money_turnover_rp_b?: number | null;
+  retail_turnover_rp_b?: number | null;
+  smart_money_delta: number | null;
   market_signal: string;
   anomalies_detected: number;
+  broker_attribution_available: boolean;
 }
 
 export interface StealthAccumulationResponse {
   summary: StealthAccumulationSummary | string;
   signal: string;
-  smart_money_delta: number;
+  smart_money_delta: number | null;
   anomalies: StealthAnomaly[];
 }
 
@@ -346,7 +464,9 @@ export interface WatchlistItem {
   name: string;
   sector?: string;
   price?: number;
+  close?: number;
   daily_change?: number;
+  daily_change_pct?: number;
   score?: number;
   addedAt: string;
 }
@@ -358,4 +478,66 @@ export interface LiveAlert {
   title: string;
   message: string;
   timestamp: string;
+}
+
+export type ScreenerTimeframe = 'close_pressure' | 'swing' | 'long_term';
+
+export interface ScreenerResult {
+  ticker: string;
+  company?: string | null;
+  price?: number | null;
+  change?: number | null;
+  change_pct?: number | null;
+  volume?: number | null;
+  value?: number | null;
+  setup?: string | null;
+  signal?: string | null;
+  engine_score?: number | null;
+  trend?: string | null;
+  pressure?: number | null;
+  foreign?: number | null;
+  liquidity?: number | null;
+  lifecycle?: string | null;
+  timeframe?: ScreenerTimeframe | string | null;
+  entry_zone?: number | null;
+  tp1?: number | null;
+  tp2?: number | null;
+  tp3?: number | null;
+  cl1?: number | null;
+  cl2?: number | null;
+  cl3?: number | null;
+  rr1?: number | null;
+  rr2?: number | null;
+  rr3?: number | null;
+  historical_tp_probability?: number | null;
+  median_days?: number | null;
+  mfe?: number | null;
+  mae?: number | null;
+  sample_size?: number | null;
+  stats_status?: string | null;
+  stats_note?: string | null;
+  data_quality?: string | null;
+  source?: string | null;
+  as_of?: string | null;
+  confidence?: number | null;
+  why_signal?: string | null;
+  status?: string | null;
+  engine_version?: string | null;
+}
+
+export interface ScreenerResponse {
+  results: ScreenerResult[];
+  meta: {
+    status?: string;
+    timeframe?: string;
+    as_of?: string | null;
+    count?: number;
+    total_matched?: number;
+    limit?: number;
+    cursor?: number;
+    next_cursor?: number | null;
+    engine_version?: string;
+    limitations?: string[];
+    [key: string]: unknown;
+  };
 }

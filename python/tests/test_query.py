@@ -50,6 +50,20 @@ def test_query_limit(ts_dir):
     assert len(query_dataset("stock_summary", limit=2)) == 2
 
 
+def test_query_chronological_by_date(ts_dir):
+    df = query_dataset("stock_summary", where="StockCode = 'BBCA'")
+    assert list(df["Date"].astype(str).str[:10]) == ["2026-01-05", "2026-01-06"]
+    assert list(df["Close"]) == [9000.0, 9100.0]
+
+
+def test_query_limit_returns_latest_sessions(ts_dir):
+    """limit must return the most recent N dates, not the earliest / arbitrary ORDER BY 1."""
+    df = query_dataset("stock_summary", where="StockCode = 'BBCA'", limit=1)
+    assert len(df) == 1
+    assert str(df.iloc[0]["Date"])[:10] == "2026-01-06"
+    assert float(df.iloc[0]["Close"]) == 9100.0
+
+
 def test_missing_dataset_raises(ts_dir):
     with pytest.raises(FileNotFoundError):
         query_dataset("broker_summary")

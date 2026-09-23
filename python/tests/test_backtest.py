@@ -59,6 +59,49 @@ class TestBacktest(unittest.TestCase):
         self.assertIn("win_rate_pct", metrics)
         self.assertEqual(metrics["total_trades"], 6)
         self.assertGreater(metrics["win_rate_pct"], 50.0)
+        self.assertIsNone(metrics["cagr_pct"])
+        self.assertIsNone(metrics["alpha_pct"])
+
+    def test_calculate_metrics_edge_cases(self):
+        one = calculate_metrics(pd.Series([0.10]))
+        self.assertEqual(one["total_trades"], 1)
+        self.assertAlmostEqual(one["total_return_pct"], 10.0, places=2)
+        self.assertEqual(one["win_rate_pct"], 100.0)
+        self.assertIsNone(one["cagr_pct"])
+
+        all_win = calculate_metrics(pd.Series([0.01, 0.02, 0.03]))
+        self.assertEqual(all_win["win_rate_pct"], 100.0)
+
+        all_lose = calculate_metrics(pd.Series([-0.01, -0.02, -0.03]))
+        self.assertEqual(all_lose["win_rate_pct"], 0.0)
+        self.assertLess(all_lose["total_return_pct"], 0.0)
+
+        zero_var = calculate_metrics(pd.Series([0.01, 0.01, 0.01]))
+        self.assertEqual(zero_var["sharpe_ratio"], 0.0)  # std == 0 → sharpe 0
+        self.assertFalse(np.isnan(zero_var["sharpe_ratio"]))
+
+        with_bench = calculate_metrics(
+            pd.Series([0.05, 0.05]), benchmark_returns=pd.Series([0.01, 0.01])
+        )
+        self.assertIsNotNone(with_bench["benchmark_return_pct"])
+        self.assertIsNotNone(with_bench["alpha_pct"])
+        self.assertIsNone(with_bench["cagr_pct"])
+
+    def test_portfolio_period_metrics_match_equal_weight_exit_groups(self):
+        """Parallel same-ExitDate trades must average, not chain-compound."""
+        from idx.backtest import _portfolio_period_returns
+
+        trades = pd.DataFrame(
+            {
+                "ExitDate": ["2026-01-07", "2026-01-07"],
+                "Return": [0.20, 0.10],
+            }
+        )
+        period = _portfolio_period_returns(trades)
+        self.assertEqual(len(period), 1)
+        self.assertAlmostEqual(float(period.iloc[0]), 0.15, places=6)
+        m = calculate_metrics(period)
+        self.assertAlmostEqual(m["total_return_pct"], 15.0, places=2)
 
     def test_run_backtest_foreign_flow(self):
         metrics, trades = run_backtest(

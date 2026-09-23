@@ -167,109 +167,193 @@ async def async_backfill_dataset(
     endpoint,
     start_date,
     end_date,
-    concurrency=5,
-    delay=0.2,
+    concurrency=1,
+    delay=5.0,
     client=None,
 ):
-    """Asynchronous concurrent backfill loop across trading days."""
+    """
+    Safe/resumable asynchronous backfill.
+
+    Important:
+    - Existing parquet partitions are never overwritten unnecessarily.
+    - Missing dates are fetched one at a time by default.
+    - A delay is applied between requests.
+    - IDX 429/5xx handling remains inside AsyncIDXClient.
+    """
+
     import asyncio
 
     from idx.core.client import AsyncIDXClient
 
     have = ts.existing_dates(dataset)
     dates = list(_trading_days(start_date, end_date))
-    to_fetch = [d for d in dates if d.strftime("%Y-%m-%d") not in have]
+
+    missing = [
+        dt for dt in dates
+        if dt.strftime("%Y-%m-%d") not in have
+    ]
 
     log.info(
-        "Async backfill %s: %d total days (%d cached, %d to fetch, concurrency=%d, delay=%.2fs)",
+        "%s: %d total trading days (%d cached, %d missing)",
         dataset,
         len(dates),
-        len(dates) - len(to_fetch),
-        len(to_fetch),
-        concurrency,
-        delay,
+        len(dates) - len(missing),
+        len(missing),
     )
 
-    if not to_fetch:
+    if not missing:
         return {
             "dataset": dataset,
+            "requested_days": len(dates),
+            "cached_days": len(dates),
+            "missing_days": 0,
+            # Sync-compatible keys (primary contract)
             "dates_fetched": 0,
-            "dates_skipped": len(dates),
+            "dates_skipped": 0,
             "errors": 0,
             "total_records": 0,
+            # Async aliases
+            "fetched_days": 0,
+            "skipped_days": 0,
+            "records": 0,
         }
 
-    async_client = client or AsyncIDXClient(concurrency=concurrency, delay_seconds=delay)
-    sem = asyncio.Semaphore(concurrency)
-    lock = asyncio.Lock()
+    # Keep the client conservative. The caller can still request a
+    # different concurrency, but IDX backfill defaults to serial operation.
+    safe_concurrency = max(1, int(concurrency or 1))
+    safe_delay = max(0.0, float(delay or 0.0))
 
-    fetched = 0
-    skipped = len(dates) - len(to_fetch)
-    errors = 0
-    total_records = 0
+    async def run(client_obj):
+        sem = asyncio.Semaphore(safe_concurrency)
+        lock = asyncio.Lock()
 
-    async def _worker(dt, idx, total_tasks):
-        nonlocal fetched, skipped, errors, total_records
-        date_str = dt.strftime("%Y-%m-%d")
-        date_api = dt.strftime("%Y%m%d")
+        fetched = 0
+        skipped = 0
+        errors = 0
+        total_records = 0
 
-        async with sem:
-            if delay > 0:
-                await asyncio.sleep(delay)
-            try:
-                data = await async_client.get_json(
-                    endpoint, params={"date": date_api, "start": 0, "length": 9999}
+        async def _worker(dt, idx, total_tasks):
+            nonlocal fetched, skipped, errors, total_records
+
+            date_str = dt.strftime("%Y-%m-%d")
+            date_api = dt.strftime("%Y%m%d")
+
+            async with sem:
+                # Re-check immediately before requesting. This makes the
+                # operation resumable if a previous worker/process already
+                # created the partition.
+                if date_str in ts.existing_dates(dataset):
+                    async with lock:
+                        skipped += 1
+                    log.info(
+                        "[%d/%d] %s: already cached",
+                        idx,
+                        total_tasks,
+                        date_str,
+                    )
+                    return
+
+                if safe_delay > 0:
+                    await asyncio.sleep(safe_delay)
+
+                try:
+                    data = await client_obj.get_json(
+                        endpoint,
+                        params={
+                            "date": date_api,
+                            "start": 0,
+                            "length": 9999,
+                        },
+                    )
+                except Exception as exc:
+                    async with lock:
+                        errors += 1
+
+                    log.warning(
+                        "[%d/%d] %s: request error: %s",
+                        idx,
+                        total_tasks,
+                        date_str,
+                        exc,
+                    )
+                    return
+
+                records = (
+                    data.get("data")
+                    if isinstance(data, dict)
+                    else None
                 )
-            except Exception as exc:
-                log.warning("Error fetching %s for %s: %s", dataset, date_api, exc)
-                async with lock:
-                    errors += 1
-                return
 
-            if data is None:
-                async with lock:
-                    errors += 1
-                log.warning(
-                    "[%d/%d] %s: fetch failed (HTTP error or request blocked)",
-                    idx,
-                    total_tasks,
-                    date_str,
-                )
-                return
+                if isinstance(records, list) and len(records) > 0:
+                    # Write only after a successful non-empty response.
+                    ts.write_partition(
+                        dataset,
+                        date_str,
+                        records,
+                    )
 
-            records = data.get("data") if isinstance(data, dict) else None
-            if isinstance(records, list) and len(records) > 0:
-                ts.write_partition(dataset, date_str, records)
-                async with lock:
-                    fetched += 1
-                    total_records += len(records)
-                log.info("[%d/%d] %s: %d records", idx, total_tasks, date_str, len(records))
-            else:
-                async with lock:
-                    skipped += 1
-                log.debug("[%d/%d] %s: no data", idx, total_tasks, date_str)
+                    async with lock:
+                        fetched += 1
+                        total_records += len(records)
 
-    tasks = [_worker(dt, i + 1, len(to_fetch)) for i, dt in enumerate(to_fetch)]
-    await asyncio.gather(*tasks)
+                    log.info(
+                        "[%d/%d] %s: %d records",
+                        idx,
+                        total_tasks,
+                        date_str,
+                        len(records),
+                    )
+                else:
+                    async with lock:
+                        skipped += 1
 
-    log.info(
-        "Async backfill %s finished: fetched=%d, skipped=%d, errors=%d, total_records=%d",
-        dataset,
-        fetched,
-        skipped,
-        errors,
-        total_records,
-    )
-    return {
-        "dataset": dataset,
-        "dates_fetched": fetched,
-        "dates_skipped": skipped,
-        "errors": errors,
-        "total_records": total_records,
-    }
+                    log.info(
+                        "[%d/%d] %s: no data (holiday/weekend/empty)",
+                        idx,
+                        total_tasks,
+                        date_str,
+                    )
 
+        # With concurrency=1 this becomes a clean serial request stream.
+        # gather is retained so the same function remains compatible with
+        # callers that intentionally request limited concurrency.
+        tasks = [
+            asyncio.create_task(
+                _worker(dt, idx, len(missing))
+            )
+            for idx, dt in enumerate(missing, start=1)
+        ]
 
-async def async_backfill_stock_summary(start_date, end_date, concurrency=5, delay=0.2, client=None):
+        if tasks:
+            await asyncio.gather(*tasks)
+
+        return {
+            "dataset": dataset,
+            "requested_days": len(dates),
+            "cached_days": len(dates) - len(missing),
+            "missing_days": len(missing),
+            # Sync-compatible keys (primary contract)
+            "dates_fetched": fetched,
+            "dates_skipped": skipped,
+            "errors": errors,
+            "total_records": total_records,
+            # Async aliases
+            "fetched_days": fetched,
+            "skipped_days": skipped,
+            "records": total_records,
+        }
+
+    if client is not None:
+        return await run(client)
+
+    async with AsyncIDXClient(
+        max_retries=2,
+        delay_seconds=1.5,
+        concurrency=safe_concurrency,
+    ) as async_client:
+        return await run(async_client)
+
+async def async_backfill_stock_summary(start_date, end_date, concurrency=1, delay=5.0, client=None):
     """Async backfill for stock OHLCV summaries."""
     return await async_backfill_dataset(
         "stock_summary",
@@ -282,9 +366,7 @@ async def async_backfill_stock_summary(start_date, end_date, concurrency=5, dela
     )
 
 
-async def async_backfill_broker_summary(
-    start_date, end_date, concurrency=5, delay=0.2, client=None
-):
+async def async_backfill_broker_summary(start_date, end_date, concurrency=1, delay=5.0, client=None):
     """Async backfill for broker transaction summaries."""
     return await async_backfill_dataset(
         "broker_summary",
@@ -297,7 +379,7 @@ async def async_backfill_broker_summary(
     )
 
 
-async def async_backfill_index_summary(start_date, end_date, concurrency=5, delay=0.2, client=None):
+async def async_backfill_index_summary(start_date, end_date, concurrency=1, delay=5.0, client=None):
     """Async backfill for index summaries."""
     return await async_backfill_dataset(
         "index_summary",

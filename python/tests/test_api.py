@@ -47,6 +47,8 @@ class TestAPI(unittest.TestCase):
         data = response.json()
         self.assertIn("smart_money_delta", data)
         self.assertIn("signal", data)
+        self.assertEqual(data["signal"], "UNAVAILABLE")
+        self.assertIsNone(data["smart_money_delta"])
 
     def test_backtest_endpoint(self):
         response = self.client.post(
@@ -63,7 +65,149 @@ class TestAPI(unittest.TestCase):
         self.assertIn("metrics", data)
         self.assertIn("equity_curve", data)
         self.assertIn("trades", data)
-        self.assertGreater(len(data["equity_curve"]), 0)
+        # Zero-trade runs may have an empty equity curve (no fabricated placeholder date).
+        self.assertIsInstance(data["equity_curve"], list)
+        # CAGR must never silently equal total return
+        metrics = data["metrics"]
+        self.assertTrue(
+            metrics.get("cagr_pct") is None
+            or metrics.get("cagr_pct") != metrics.get("total_return_pct")
+        )
+
+    def test_backtest_result_contract_synthetic(self):
+        """Deterministic engine → API contract: trades, dates, numerics, CAGR safety."""
+        import pandas as pd
+
+        trades = pd.DataFrame(
+            [
+                {
+                    "EntryDate": "2026-01-05",
+                    "ExitDate": "2026-01-07",
+                    "StockCode": "AAA",
+                    "EntryPrice": 100.0,
+                    "ExitPrice": 120.0,
+                    "ReturnPct": 20.0,
+                    "Return": 0.20,
+                },
+                {
+                    "EntryDate": "2026-01-05",
+                    "ExitDate": "2026-01-07",
+                    "StockCode": "BBB",
+                    "EntryPrice": 50.0,
+                    "ExitPrice": 55.0,
+                    "ReturnPct": 10.0,
+                    "Return": 0.10,
+                },
+            ]
+        )
+        # Equal-weight period return = 0.15 → total_return_pct = 15.0
+        metrics = {
+            "total_return_pct": 15.0,
+            "cagr_pct": None,
+            "sharpe_ratio": 1.2,
+            "sortino_ratio": 1.1,
+            "max_drawdown_pct": 0.0,
+            "win_rate_pct": 100.0,
+            "profit_factor": 999.0,
+            "total_trades": 2,
+            "avg_trade_return_pct": 15.0,
+            "benchmark_return_pct": None,
+            "alpha_pct": None,
+            "strategy": "foreign_flow",
+            "holding_days": 2,
+        }
+
+        with patch("idx.backtest.run_backtest", return_value=(metrics, trades)):
+            response = self.client.post(
+                "/api/backtest",
+                json={
+                    "strategy": "foreign_flow",
+                    "holding_days": 2,
+                    "top_n": 2,
+                    "min_turnover_rp": 1e8,
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+
+        m = data["metrics"]
+        self.assertIsNone(m["cagr_pct"])
+        self.assertNotEqual(m["cagr_pct"], m["total_return_pct"])
+        self.assertEqual(m["total_trades"], 2)
+        self.assertEqual(m["trades_returned"], 2)
+        self.assertEqual(m["total_return_pct"], 15.0)
+        self.assertIsNone(m["alpha_pct"])
+
+        self.assertEqual(len(data["trades"]), 2)
+        t0 = data["trades"][0]
+        self.assertRegex(t0["EntryDate"], r"^\d{4}-\d{2}-\d{2}$")
+        self.assertRegex(t0["ExitDate"], r"^\d{4}-\d{2}-\d{2}$")
+        self.assertIsInstance(t0["EntryPrice"], (int, float))
+        self.assertIsInstance(t0["ExitPrice"], (int, float))
+        self.assertIsInstance(t0["Return"], (int, float))
+        self.assertAlmostEqual(float(t0["Return"]), (t0["ExitPrice"] - t0["EntryPrice"]) / t0["EntryPrice"], places=6)
+
+        # Equity curve: base 100 then one exit session at 115 (mean return 15%)
+        self.assertGreaterEqual(len(data["equity_curve"]), 2)
+        self.assertEqual(data["equity_curve"][0]["value"], 100.0)
+        self.assertAlmostEqual(data["equity_curve"][-1]["value"], 115.0, places=2)
+        times = [p["time"] for p in data["equity_curve"]]
+        self.assertEqual(times, sorted(times))
+
+    def test_backtest_zero_trades_empty_equity_curve(self):
+        import pandas as pd
+
+        metrics = {
+            "total_return_pct": 0.0,
+            "cagr_pct": None,
+            "sharpe_ratio": 0.0,
+            "sortino_ratio": 0.0,
+            "max_drawdown_pct": 0.0,
+            "win_rate_pct": 0.0,
+            "profit_factor": 0.0,
+            "total_trades": 0,
+            "avg_trade_return_pct": 0.0,
+            "benchmark_return_pct": None,
+            "alpha_pct": None,
+            "strategy": "foreign_flow",
+            "holding_days": 10,
+        }
+        with patch("idx.backtest.run_backtest", return_value=(metrics, pd.DataFrame())):
+            response = self.client.post(
+                "/api/backtest",
+                json={"strategy": "foreign_flow", "holding_days": 10, "top_n": 5},
+            )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["equity_curve"], [])
+        self.assertEqual(data["trades"], [])
+        self.assertEqual(data["metrics"]["total_trades"], 0)
+        self.assertIsNone(data["metrics"]["cagr_pct"])
+
+    def test_backtester_tab_never_displays_cagr_as_total_return(self):
+        """Frontend source guard: Total Strategy Return must not use cagr_pct."""
+        import os
+
+        path = os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "..",
+            "frontend",
+            "src",
+            "components",
+            "BacktesterTab.tsx",
+        )
+        path = os.path.abspath(path)
+        with open(path, encoding="utf-8") as f:
+            src = f.read()
+        self.assertIn("total_return_pct", src)
+        self.assertIn("not CAGR", src)
+        # Must not render cagr_pct into the KPI value
+        self.assertNotIn("metrics?.cagr_pct}", src)
+        self.assertNotIn("metrics.cagr_pct}", src)
+        self.assertNotIn(">CAGR<", src)
+        self.assertNotIn("'CAGR'", src)
+        self.assertNotIn('"CAGR"', src)
 
     def test_broadcast_endpoint(self):
         response = self.client.post("/api/broadcast", json={"type": "test_event", "val": 123})
@@ -225,9 +369,15 @@ class TestAPI(unittest.TestCase):
             self.assertIn("blocks", data)
             self.assertIn("non_regular_value_rp", data)
             self.assertIn("smart_accumulation_ratio", data)
-        # Non-existent ticker 404
-        resp_404 = self.client.get("/api/stock/INVALID_ZZZZ/blocks")
-        self.assertEqual(resp_404.status_code, 404)
+            # Honesty: whale / smart-accumulation never fabricated as 0.
+            self.assertIsNone(data.get("total_whale_value_rp"))
+            self.assertFalse(data.get("broker_blocks_available"))
+        # Invalid ticker form → 400 (sanitize); unknown-but-valid form → 404
+        resp_bad = self.client.get("/api/stock/INVALID_ZZZZ/blocks")
+        self.assertEqual(resp_bad.status_code, 400)
+        resp_404 = self.client.get("/api/stock/ZZZZ/blocks")
+        self.assertIn(resp_404.status_code, (404, 200))  # 200 only if synthetic data present
+
 
 
 if __name__ == "__main__":

@@ -53,12 +53,12 @@ def test_radar_flags_accumulation_and_distribution(stock_df):
     out = foreign_flow_radar(stock_df, min_abs_pct_float=0.5)
     by_code = out.set_index("StockCode")
 
-    assert set(out["Signal"]) == {"accumulate", "distribute"}
-    # AAA: +120M shares / 1e9 float = 12% -> accumulate
-    assert by_code.loc["AAA", "Signal"] == "accumulate"
+    assert set(out["Signal"]) == {"foreign_inflow", "foreign_outflow"}
+    # AAA: +120M shares / 1e9 float = 12% -> foreign_inflow
+    assert by_code.loc["AAA", "Signal"] == "foreign_inflow"
     assert by_code.loc["AAA", "PctFloat"] == pytest.approx(12.0)
-    # BBB: -40M / 1e9 = -4% -> distribute
-    assert by_code.loc["BBB", "Signal"] == "distribute"
+    # BBB: -40M / 1e9 = -4% -> foreign_outflow
+    assert by_code.loc["BBB", "Signal"] == "foreign_outflow"
     assert by_code.loc["BBB", "PctFloat"] == pytest.approx(-4.0)
     # Sorted strongest first
     assert out["PctFloat"].is_monotonic_decreasing
@@ -166,3 +166,108 @@ def test_composite_alpha_and_tech_indicators(stock_df):
     )
     alpha = composite_alpha_ranking(stock_df, ratios, min_turnover_rp=1e8)
     assert isinstance(alpha, pd.DataFrame)
+
+
+def test_trend_regime_is_point_in_time_per_row():
+    """TrendRegime must reflect each row's own close vs EMAs, not the final bar only."""
+    from idx.signals import compute_technical_indicators
+
+    # Construct a clear regime change: early bearish stretch then a strong rally.
+    n = 60
+    closes = [100.0 - i * 0.5 for i in range(30)] + [85.0 + i * 1.5 for i in range(30)]
+    df = pd.DataFrame(
+        {
+            "Date": pd.date_range("2026-01-01", periods=n).strftime("%Y-%m-%d"),
+            "StockCode": ["AAA"] * n,
+            "OpenPrice": closes,
+            "High": [c + 1 for c in closes],
+            "Low": [c - 1 for c in closes],
+            "Close": closes,
+            "Volume": [1e6] * n,
+            "Previous": [closes[0]] + closes[:-1],
+        }
+    )
+    tech = compute_technical_indicators(df)
+    # Broadcast bug would assign a single regime to every historical row.
+    assert tech["TrendRegime"].nunique() > 1
+    assert tech.iloc[25]["TrendRegime"] != tech.iloc[-1]["TrendRegime"]
+
+
+def test_foreign_flow_close_uses_latest_session_not_row_order():
+    from idx.signals import foreign_flow_radar
+
+    # Deliberately reverse chronological row order within the ticker.
+    df = pd.DataFrame(
+        {
+            "Date": ["2026-08-07", "2026-08-06", "2026-08-05", "2026-08-04"],
+            "StockCode": ["AAA"] * 4,
+            "Close": [140.0, 130.0, 120.0, 110.0],
+            "Value": [5e9] * 4,
+            "TradebleShares": [1e9] * 4,
+            "NetForeignFlow": [10e6] * 4,
+        }
+    )
+    out = foreign_flow_radar(df, window_days=4, min_abs_pct_float=0.0, min_turnover_rp=1e8)
+    assert float(out.iloc[0]["Close"]) == 140.0
+
+
+def test_latest_per_code_respects_as_of_cutoff():
+    from idx.signals import _latest_per_code, composite_alpha_ranking
+
+    ratios = pd.DataFrame(
+        {
+            "code": ["AAA", "AAA"],
+            "stockName": ["A", "A"],
+            "fsDate": ["2025-06-30", "2026-06-30"],
+            "per": [8.0, 50.0],
+            "roe": [10.0, 40.0],
+            "deRatio": [0.5, 0.5],
+            "opini": ["WTM", "WTM"],
+        }
+    )
+    pit = _latest_per_code(ratios, as_of="2025-12-31")
+    assert len(pit) == 1
+    assert float(pit.iloc[0]["per"]) == 8.0
+
+    # Undated filings must not leak through an as_of cutoff.
+    with_undated = pd.concat(
+        [
+            ratios,
+            pd.DataFrame(
+                [
+                    {
+                        "code": "AAA",
+                        "stockName": "A",
+                        "fsDate": None,
+                        "per": 1.0,
+                        "roe": 99.0,
+                        "deRatio": 0.1,
+                        "opini": "WTM",
+                    }
+                ]
+            ),
+        ],
+        ignore_index=True,
+    )
+    pit_undated = _latest_per_code(with_undated, as_of="2025-12-31")
+    assert len(pit_undated) == 1
+    assert float(pit_undated.iloc[0]["per"]) == 8.0
+
+    stock = pd.DataFrame(
+        {
+            "Date": pd.date_range("2026-01-01", periods=5).strftime("%Y-%m-%d"),
+            "StockCode": ["AAA"] * 5,
+            "Close": [100.0] * 5,
+            "Value": [5e9] * 5,
+            "TradebleShares": [1e9] * 5,
+            "NetForeignFlow": [10e6] * 5,
+            "ForeignBuy": [20e6] * 5,
+            "ForeignSell": [10e6] * 5,
+        }
+    )
+    alpha_future = composite_alpha_ranking(stock, ratios, min_turnover_rp=1e8, as_of="2026-12-31")
+    alpha_past = composite_alpha_ranking(stock, ratios, min_turnover_rp=1e8, as_of="2025-12-31")
+    assert not alpha_past.empty
+    # Past cutoff must not see the 2026 filing PER=50.
+    assert float(alpha_past.iloc[0]["PER"]) == pytest.approx(8.0)
+    assert float(alpha_future.iloc[0]["PER"]) == pytest.approx(50.0)

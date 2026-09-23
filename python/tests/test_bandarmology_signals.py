@@ -107,9 +107,13 @@ class TestBandarmologySignals(unittest.TestCase):
         self.assertIn("cr1_pct", summary)
         self.assertIn("cr3_pct", summary)
         self.assertIn("institutional_share_pct", summary)
+        self.assertIsNone(summary["institutional_share_pct"])
+        self.assertIsNone(summary["retail_share_pct"])
+        self.assertIsNone(summary["institutional_to_retail_ratio"])
         self.assertGreater(summary["cr3_pct"], 50.0)
         self.assertEqual(len(top_df), 3)
         self.assertEqual(top_df.iloc[0]["IDFirm"], "AK")
+        self.assertTrue((top_df["Category"] == "Unclassified").all())
 
     def test_compute_technical_indicators(self):
         tech = compute_technical_indicators(self.stock_data, ticker="TEST")

@@ -28,6 +28,10 @@ frontend/dist/
 
 # --- Databases & DuckDB ---
 *.duckdb
+data/.feature_rebuild_cache.json
+data/.target_risk_rebuild_cache.json
+data/.ritelinsight_watchlists.json
+data/.ritelinsight_trading_journal.json
 *.duckdb.wal
 neo4j_data/
 postgres_data/
@@ -58,3 +62,14 @@ Thumbs.db
 .claude/
 .deprecated/
 CLAUDE.md
+
+# --- Research / debug / local backups (not product data) ---
+data/idx_chunks/
+data/idx_*.txt
+data/livefeed_*
+data/trade_*
+data/chunk125_*
+data/stock_live_api_candidates.txt
+data/_excel_audit*
+data/_stealth_test_*
+**/*.bak-*

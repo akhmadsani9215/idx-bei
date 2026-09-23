@@ -161,7 +161,7 @@ def build_parser():
     p_bandar.add_argument(
         "--stealth",
         action="store_true",
-        help="Detect stealth accumulation vs retail trap anomalies",
+        help="Query stealth/retail-trap status (returns unavailable without verified broker attribution)",
     )
     p_bandar.add_argument(
         "--lookback",
@@ -261,7 +261,7 @@ def build_parser():
 
     # 12. Dashboard & Web Server
     p_dash = sub.add_parser(
-        "dashboard", help="Start unified Smart Money Dashboard & API Web server"
+        "dashboard", help="Start unified RitelInsight Dashboard & API Web server"
     )
     p_dash.add_argument("--host", default="0.0.0.0", help="Host address (default: 0.0.0.0)")
     p_dash.add_argument("--port", type=int, default=8000, help="Port to bind (default: 8000)")
@@ -307,7 +307,7 @@ def main(argv=None):
         from idx.api import run_server
 
         print(
-            f"=== Starting Unified Smart Money Dashboard & Microservice API on http://localhost:{args.port}/ ==="
+            f"=== Starting Unified RitelInsight Dashboard & Microservice API on http://localhost:{args.port}/ ==="
         )
         print(f"  • Web Dashboard:  http://localhost:{args.port}/")
         print(f"  • REST & WS API:  http://localhost:{args.port}/docs")
@@ -402,9 +402,7 @@ def main(argv=None):
         print(
             f"Concentration Ratios : CR1={summary.get('cr1_pct', '-')}%, CR3={summary.get('cr3_pct', '-')}%, CR5={summary.get('cr5_pct', '-')}%"
         )
-        print(
-            f"Inst vs Retail Share : Inst={summary.get('institutional_share_pct', '-')}% vs Retail={summary.get('retail_share_pct', '-')}% (Ratio: {summary.get('institutional_to_retail_ratio', '-')})"
-        )
+        print("Institutional/Retail attribution: N/A (not verified)")
         print("\nTop Brokers:")
         with pd.option_context("display.max_columns", None, "display.width", 150):
             print(top_df.to_string(index=False))
@@ -420,11 +418,13 @@ def main(argv=None):
                 lookback_days=getattr(args, "lookback", 5),
                 min_turnover_rp=getattr(args, "min_turnover", 1.0) * 1e9,
             )
-            print("\nStealth Accumulation vs Retail Trap:")
+            print("\nBroker Attribution Status:")
+            print(f"  Signal             : {stealth['signal']}")
+            print("  Attribution Delta  : N/A")
             print(
-                f"  Smart Money Delta : {stealth['smart_money_delta']} (Smart: Rp{stealth['summary'].get('smart_money_turnover_rp_b', 0)}B vs Retail: Rp{stealth['summary'].get('retail_turnover_rp_b', 0)}B)"
+                "  Broker Attribution : "
+                f"{stealth['summary'].get('broker_attribution_available', False)}"
             )
-            print(f"  Market Signal     : {stealth['signal']}")
             print(f"  Lookback Window   : {getattr(args, 'lookback', 5)} sessions")
             if len(stealth["anomalies_df"]) > 0:
                 print("\nFlagged Stocks / Anomalies:")
@@ -633,7 +633,7 @@ def main(argv=None):
         from idx.api import run_server
 
         print(
-            f"=== Starting Unified Smart Money Dashboard & Microservice API on http://localhost:{args.port}/ ==="
+            f"=== Starting Unified RitelInsight Dashboard & Microservice API on http://localhost:{args.port}/ ==="
         )
         print(f"  • Web Dashboard:  http://localhost:{args.port}/")
         print(f"  • REST & WS API:  http://localhost:{args.port}/docs")

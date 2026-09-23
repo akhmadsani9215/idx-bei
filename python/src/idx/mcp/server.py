@@ -108,7 +108,7 @@ TOOLS = [
     },
     {
         "name": "idx_query_broker_flow",
-        "description": "Query broker market share, top buyer/seller concentration ratios (CR1, CR3, CR5), and institutional vs retail footprint.",
+        "description": "Query broker market share and top concentration ratios (CR1, CR3, CR5) from actual turnover. Institutional/retail broker attribution is not inferred.",
         "inputSchema": {
             "type": "object",
             "properties": {

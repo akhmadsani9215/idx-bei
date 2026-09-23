@@ -24,29 +24,21 @@ import {
   AlertCircle, 
   FileText, 
   Star,
-  Radio
+  Radio,
+  Clock,
+  AlertTriangle,
 } from 'lucide-react';
 import type { Company, StreamEvent } from '../types';
-import { fetchStockData, fetchStockBlocks } from '../services/api';
-
-interface BlockTrade {
-  id: string;
-  time: string;
-  price: number;
-  lots: number;
-  valueRp: number;
-  buyerBroker: string;
-  buyerName: string;
-  buyerType: 'INSTITUTIONAL' | 'RETAIL';
-  sellerBroker: string;
-  sellerName: string;
-  sellerType: 'INSTITUTIONAL' | 'RETAIL';
-  tradeType: 'WHALE_BUY' | 'WHALE_DUMP' | 'BLOCK_CROSSING';
-  isWhale: boolean;
-}
+import { fetchStockData, fetchStockBlocks, fetchStockTerminal } from '../services/api';
+import {
+  formatMarketDateLabel,
+  isScreenerOlderThanTerminal,
+  resolveScreenerAsOf,
+} from '../utils/marketAsOf';
 
 interface ChartTabProps {
   companies: Company[];
+  screenerLastUpdated?: string | null;
   selectedTicker?: string;
   onSelectTicker?: (ticker: string) => void;
   lastLiveEvent: StreamEvent | null;
@@ -57,6 +49,7 @@ interface ChartTabProps {
 
 export const ChartTab: React.FC<ChartTabProps> = ({
   companies,
+  screenerLastUpdated = null,
   selectedTicker = 'BBCA',
   onSelectTicker,
   lastLiveEvent,
@@ -91,23 +84,47 @@ export const ChartTab: React.FC<ChartTabProps> = ({
 
   const company = companies.find((c) => c.code === activeTicker);
 
+  const terminalAsOf = useMemo(
+    () => formatMarketDateLabel(latestData?.time ?? latestData?.Date),
+    [latestData],
+  );
+
+  const screenerAsOf = useMemo(
+    () => resolveScreenerAsOf(company?.price_date, screenerLastUpdated),
+    [company?.price_date, screenerLastUpdated],
+  );
+
+  const screenerLagsTerminal = useMemo(
+    () => isScreenerOlderThanTerminal(screenerAsOf, terminalAsOf),
+    [screenerAsOf, terminalAsOf],
+  );
+
+  const [terminalMeta, setTerminalMeta] = useState<any>(null);
+
   // Fetch real market data whenever activeTicker changes
   useEffect(() => {
     let isCancelled = false;
     setLoading(true);
     setFetchError(null);
+    setTerminalMeta(null);
 
-    fetchStockData(activeTicker)
-      .then((data) => {
-        if (!isCancelled) {
-          if (data && data.records && data.records.length > 0) {
-            setStockRecords(data.records);
-            setLatestData(data.latest || data.records[data.records.length - 1]);
-          } else {
-            setFetchError(`No trading records found for ${activeTicker}`);
-          }
-          setLoading(false);
+    Promise.all([
+      fetchStockTerminal(activeTicker, 120).catch(() => null),
+      fetchStockData(activeTicker).catch((err) => {
+        throw err;
+      }),
+    ])
+      .then(([terminal, data]) => {
+        if (isCancelled) return;
+        const payload = terminal && terminal.records?.length ? terminal : data;
+        if (payload && payload.records && payload.records.length > 0) {
+          setStockRecords(payload.records);
+          setLatestData(payload.latest || payload.records[payload.records.length - 1]);
+          setTerminalMeta(terminal);
+        } else {
+          setFetchError(`No trading records found for ${activeTicker}`);
         }
+        setLoading(false);
       })
       .catch((err) => {
         if (!isCancelled) {
@@ -122,7 +139,7 @@ export const ChartTab: React.FC<ChartTabProps> = ({
     };
   }, [activeTicker]);
 
-  // Option C: Fetch verified real institutional block trades from backend
+  // Fetch aggregate market-flow / optional broker-block payload from backend
   const [blockData, setBlockData] = useState<any>(null);
 
   useEffect(() => {
@@ -337,7 +354,7 @@ export const ChartTab: React.FC<ChartTabProps> = ({
       foreignSeries.setData(foreignPts);
     }
 
-    // Add markers for corporate action or major institutional flow
+    // Add markers for corporate action or major aggregate flow
     const markers: SeriesMarker<Time>[] = [];
     if (candleData.length >= 10) {
       // Find highest volume day
@@ -389,7 +406,7 @@ export const ChartTab: React.FC<ChartTabProps> = ({
   };
 
   // Real closing price and daily change
-  const currentPrice = latestData?.close ?? latestData?.Close ?? company?.price ?? 0;
+  const currentPrice = latestData?.close ?? latestData?.Close ?? company?.close ?? 0;
   const prevPrice = latestData?.Previous ?? latestData?.previous_price ?? company?.previous_price;
   const dailyChange = prevPrice && currentPrice ? currentPrice - prevPrice : latestData?.Change ?? company?.daily_change ?? 0;
   const changePct = prevPrice && prevPrice > 0 ? (dailyChange / prevPrice) * 100 : 0;
@@ -402,134 +419,141 @@ export const ChartTab: React.FC<ChartTabProps> = ({
   const ema50 = latestData?.EMA50 != null ? Math.round(Number(latestData.EMA50)).toLocaleString() : '-';
   const volRatio = latestData?.VolRatio20 != null ? `${Number(latestData.VolRatio20).toFixed(2)}x` : '-';
 
-  // Real foreign flow from latest record
-  const foreignBuy = Number(latestData?.ForeignBuy || 0);
-  const foreignSell = Number(latestData?.ForeignSell || 0);
-  const netForeign = foreignBuy - foreignSell;
+  // Real foreign flow from latest record — null stays unavailable (never invent 0).
+  const foreignBuyRaw = latestData?.ForeignBuy;
+  const foreignSellRaw = latestData?.ForeignSell;
+  const foreignBuy =
+    foreignBuyRaw == null || foreignBuyRaw === ''
+      ? null
+      : Number(foreignBuyRaw);
+  const foreignSell =
+    foreignSellRaw == null || foreignSellRaw === ''
+      ? null
+      : Number(foreignSellRaw);
+  const foreignBuyN = Number.isFinite(foreignBuy as number) ? (foreignBuy as number) : null;
+  const foreignSellN = Number.isFinite(foreignSell as number) ? (foreignSell as number) : null;
+  const netForeign =
+    foreignBuyN != null && foreignSellN != null ? foreignBuyN - foreignSellN : null;
 
-  // Newbie Decision Intelligence Computation
+  // Evidence-based Market Condition
+  // Foreign flow is aggregate foreign-investor flow — not broker-level attribution.
   const priceNum = Number(currentPrice);
   const roeVal = company?.roe ?? 0;
-  const pbvVal = company?.pbv ?? company?.price_bv ?? 0;
+  const pbvVal = company?.price_bv ?? 0;
   const yieldVal = company?.yield ?? 0;
 
-  // Decision verdict
+  const isBearishTrend = trend.includes('BEARISH');
+  const isBullishTrend = trend.includes('BULLISH');
+  const isForeignOutflow = netForeign != null && netForeign < 0;
+  const isForeignInflow = netForeign != null && netForeign > 0;
+  const isOverbought = rsiStatus === 'Overbought';
+  const isOversold = rsiStatus === 'Oversold';
+
   let actionVerdict = {
-    title: 'ACCUMULATE ON WEAKNESS',
-    badge: 'BUY ZONE',
-    bg: 'rgba(16, 185, 129, 0.12)',
-    border: '#10b981',
-    color: '#34d399',
-    risk: 'Low Risk',
-    riskColor: '#34d399',
-    explanation: 'Institutional positioning is steady. High risk-reward ratio for gradual accumulation on pullbacks.',
+    title: 'WAIT FOR CONFIRMATION',
+    badge: 'NEUTRAL',
+    bg: 'rgba(148, 163, 184, 0.10)',
+    border: '#94a3b8',
+    color: '#cbd5e1',
+    risk: 'Unclear',
+    riskColor: '#cbd5e1',
+    explanation:
+      'Current technical and flow evidence is mixed. Monitor price, trend, and foreign flow before acting.',
   };
 
-  const isRetailPump = rsiStatus === 'Overbought' || (dailyChange > 0 && netForeign < 0 && Math.abs(netForeign) > foreignBuy * 2);
-  const isHighCashflow = yieldVal >= 5.0 && (roeVal >= 12.0 || company?.is_blue_chip);
-  const isStrongAccumulation = netForeign > 0 && (roeVal >= 15.0 || company?.is_blue_chip);
-
-  if (isRetailPump) {
+  if (isBearishTrend && isForeignOutflow) {
     actionVerdict = {
-      title: 'RETAIL TRAP • DO NOT CHASE',
-      badge: 'AVOID / DANGER',
-      bg: 'rgba(239, 68, 68, 0.15)',
+      title: 'WEAKNESS / FOREIGN OUTFLOW',
+      badge: 'CAUTION',
+      bg: 'rgba(239, 68, 68, 0.10)',
       border: '#ef4444',
       color: '#f87171',
-      risk: 'High Risk',
+      risk: 'Elevated Risk',
       riskColor: '#f87171',
-      explanation: 'Price is being pushed by retail FOMO while institutional smart money is actively distributing inventory. Wait for a pullback.',
+      explanation:
+        'The current trend is bearish and foreign flow is negative. This is aggregate flow only — broker attribution is unavailable.',
     };
-  } else if (isStrongAccumulation) {
+  } else if (isBullishTrend && isForeignInflow && !isOverbought) {
     actionVerdict = {
-      title: 'INSTITUTIONAL ACCUMULATION • STRONG BUY',
-      badge: 'HIGH CONVICTION',
-      bg: 'rgba(16, 185, 129, 0.18)',
+      title: 'POSITIVE MOMENTUM',
+      badge: 'WATCH',
+      bg: 'rgba(16, 185, 129, 0.10)',
       border: '#10b981',
       color: '#34d399',
-      risk: 'Low Risk',
+      risk: 'Moderate',
       riskColor: '#34d399',
-      explanation: 'Big institutional brokers are quietly soaking up market float with high capital efficiency (ROE ' + (roeVal ? `${roeVal}%` : '18%') + '). Ideal for multi-month compounding.',
+      explanation:
+        'Trend and foreign flow are currently positive. Confirmation from price structure and volume is still required.',
     };
-  } else if (isHighCashflow) {
+  } else if (isOversold && isForeignOutflow) {
     actionVerdict = {
-      title: 'CASHFLOW DIVIDEND GEM • BUY & HOLD',
-      badge: 'SAFE CASHFLOW',
-      bg: 'rgba(234, 179, 8, 0.18)',
+      title: 'OVERSOLD — WATCH FOR REVERSAL',
+      badge: 'WATCH',
+      bg: 'rgba(234, 179, 8, 0.10)',
       border: '#facc15',
       color: '#facc15',
-      risk: 'Very Low Risk',
+      risk: 'High Volatility',
       riskColor: '#facc15',
-      explanation: 'High sustainable cash dividend yield (' + yieldVal.toFixed(1) + '%) backed by solid balance sheet. Pristine wealth compounding asset.',
+      explanation:
+        'RSI is in oversold territory, but foreign flow remains negative. Oversold conditions can persist, so reversal confirmation is required.',
+    };
+  } else if (isForeignInflow && !isOverbought) {
+    actionVerdict = {
+      title: 'POSITIVE FLOW',
+      badge: 'WATCH',
+      bg: 'rgba(16, 185, 129, 0.08)',
+      border: '#10b981',
+      color: '#34d399',
+      risk: 'Moderate',
+      riskColor: '#34d399',
+      explanation:
+        'Foreign flow is positive. Monitor for continuation; broker attribution remains unavailable.',
     };
   }
-
   // Safe Entry Zone & Exit Rules strictly calculated from quant technical indicators (Bollinger Bands, EMA, ATR)
-  const safeEntryLow = latestData?.BB_Lower ? Math.round(latestData.BB_Lower) : (latestData?.Low ? Math.round(latestData.Low) : Math.round(priceNum));
+  const dayLow = latestData?.low ?? latestData?.Low;
+  const safeEntryLow = latestData?.BB_Lower
+    ? Math.round(latestData.BB_Lower)
+    : (dayLow != null ? Math.round(Number(dayLow)) : Math.round(priceNum));
   const safeEntryHigh = latestData?.EMA20 ? Math.round(latestData.EMA20) : Math.round(priceNum);
   const profitTarget = latestData?.BB_Upper ? Math.round(latestData.BB_Upper) : Math.round(priceNum);
   const stopLoss = (latestData?.BB_Lower && latestData?.ATR14) 
     ? Math.max(1, Math.round(latestData.BB_Lower - latestData.ATR14))
-    : Math.round(latestData?.Low ?? priceNum);
+    : Math.round(Number(dayLow ?? priceNum));
 
   const targetGainPct = priceNum > 0 ? (((profitTarget - priceNum) / priceNum) * 100).toFixed(1) : '0.0';
   const stopLossPct = priceNum > 0 ? (((stopLoss - priceNum) / priceNum) * 100).toFixed(1) : '0.0';
 
-  // Option C: Institutional Block Tape & Whale Order Detection State (100% real backend data)
-  const [whaleFilter, setWhaleFilter] = useState<'whales_only' | 'all'>('whales_only');
+  // Verified aggregate market-flow data.
+  // Individual broker attribution is not inferred when unavailable.
+  const brokerBlocksAvailable = blockData?.broker_blocks_available === true;
 
-  const blockTrades: BlockTrade[] = useMemo(() => {
-    if (!blockData || !blockData.blocks || blockData.blocks.length === 0) {
-      return [];
-    }
-    return blockData.blocks.map((b: any) => ({
-      id: b.id,
-      time: b.time,
-      price: Number(b.price),
-      lots: Number(b.lots),
-      valueRp: Number(b.value_rp),
-      buyerBroker: b.buyer_broker,
-      buyerName: b.buyer_name,
-      buyerType: b.buyer_type,
-      sellerBroker: b.seller_broker,
-      sellerName: b.seller_name,
-      sellerType: b.seller_type,
-      tradeType: b.trade_type,
-      isWhale: Boolean(b.is_whale),
-    }));
+  const marketFlow = useMemo(() => {
+    const n = (v: unknown): number | null => {
+      if (v == null || v === '') return null;
+      const x = Number(v);
+      return Number.isFinite(x) ? x : null;
+    };
+    return {
+      turnoverRp: n(blockData?.total_turnover_rp),
+      regularVolume: n(blockData?.regular_volume_shares),
+      vwap: n(blockData?.vwap_price),
+      nonRegularValueRp: n(blockData?.non_regular_value_rp),
+      nonRegularVolume: n(blockData?.non_regular_volume_shares),
+      nonRegularFrequency: n(blockData?.non_regular_frequency),
+      foreignBuy: n(blockData?.foreign_buy_shares),
+      foreignSell: n(blockData?.foreign_sell_shares),
+      netForeignRp: n(blockData?.net_foreign_flow_rp),
+      available: blockData != null,
+    };
   }, [blockData]);
 
-  const filteredTrades = useMemo(() => {
-    if (whaleFilter === 'whales_only') {
-      return blockTrades.filter((t: BlockTrade) => t.isWhale);
-    }
-    return blockTrades;
-  }, [blockTrades, whaleFilter]);
-
-  const totalWhaleValue = useMemo(() => {
-    if (blockData?.total_whale_value_rp != null) {
-      return Number(blockData.total_whale_value_rp);
-    }
-    return blockTrades
-      .filter((t: BlockTrade) => t.isWhale)
-      .reduce((sum: number, t: BlockTrade) => sum + t.valueRp, 0);
-  }, [blockData, blockTrades]);
-
-  const smartBuyPercent = useMemo<number | null>(() => {
-    if (blockData?.smart_accumulation_ratio != null) {
-      return Math.round(Number(blockData.smart_accumulation_ratio));
-    }
-    const whaleTrades = blockTrades.filter((t: BlockTrade) => t.isWhale);
-    if (whaleTrades.length === 0) return null;
-    const smartBuys = whaleTrades.filter((t: BlockTrade) => t.buyerType === 'INSTITUTIONAL').length;
-    return Math.round((smartBuys / whaleTrades.length) * 100);
-  }, [blockData, blockTrades]);
-
-  const largestTrade = useMemo(() => {
-    if (blockTrades.length === 0) return null;
-    return [...blockTrades].sort((a: BlockTrade, b: BlockTrade) => b.valueRp - a.valueRp)[0];
-  }, [blockTrades]);
-
+  const fmtSharesM = (v: number | null) =>
+    v == null ? '—' : `${(v / 1e6).toFixed(2)}M shares`;
+  const fmtRpB = (v: number | null) =>
+    v == null ? '—' : `Rp ${(v / 1e9).toFixed(2)}B`;
+  const fmtCount = (v: number | null) =>
+    v == null ? '—' : v.toLocaleString();
   return (
     <div className="tab-panel active">
       {/* Search & Stock Header */}
@@ -627,9 +651,102 @@ export const ChartTab: React.FC<ChartTabProps> = ({
             </div>
           </div>
         </div>
+
+        {(terminalAsOf || screenerAsOf) && (
+          <div
+            style={{
+              marginTop: '0.85rem',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '0.75rem 1.25rem',
+              fontSize: '0.8rem',
+              color: 'var(--text-secondary)',
+              alignItems: 'center',
+            }}
+          >
+            {terminalAsOf && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Clock size={14} style={{ color: '#38bdf8' }} />
+                <span>
+                  Market data as-of (data date):{' '}
+                  <strong style={{ color: '#e2e8f0', fontFamily: 'monospace' }}>{terminalAsOf}</strong>
+                </span>
+              </span>
+            )}
+            {screenerAsOf && (
+              <span>
+                Screener overlay as-of (data date):{' '}
+                <strong style={{ color: '#e2e8f0', fontFamily: 'monospace' }}>{screenerAsOf}</strong>
+              </span>
+            )}
+            {terminalMeta?.data_quality && (
+              <span>
+                DQ {terminalMeta.data_quality}
+                {terminalMeta.source ? ` · ${terminalMeta.source}` : ''}
+              </span>
+            )}
+          </div>
+        )}
+
+        <div
+          style={{
+            marginTop: '0.75rem',
+            display: 'grid',
+            gap: '0.5rem',
+            fontSize: '0.8rem',
+            color: '#fde68a',
+          }}
+        >
+          <div>
+            ORDERBOOK:{' '}
+            {terminalMeta?.orderbook?.status
+              ? `ORDERBOOK ${terminalMeta.orderbook.status}`
+              : 'ORDERBOOK UNAVAILABLE'}
+          </div>
+          <div>
+            TAPE:{' '}
+            {terminalMeta?.tape?.status
+              ? `TRANSACTION TAPE ${terminalMeta.tape.status}`
+              : 'TRANSACTION TAPE UNAVAILABLE'}
+          </div>
+          <div style={{ color: '#94a3b8' }}>
+            Broker scope: MARKET-WIDE only — not stock-specific attribution.
+          </div>
+          {terminalMeta?.screener?.close_pressure?.why_signal && (
+            <div style={{ color: '#cbd5e1' }}>
+              Engine: {terminalMeta.screener.close_pressure.setup || '—'} ·{' '}
+              {terminalMeta.screener.close_pressure.why_signal}
+            </div>
+          )}
+        </div>
+
+        {screenerLagsTerminal && terminalAsOf && screenerAsOf && (
+          <div
+            style={{
+              marginTop: '0.75rem',
+              background: 'rgba(234, 179, 8, 0.1)',
+              border: '1px solid rgba(234, 179, 8, 0.35)',
+              borderRadius: '10px',
+              padding: '0.75rem 1rem',
+              color: '#fbbf24',
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '0.5rem',
+            }}
+          >
+            <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
+            <span>
+              Screener data is older than the latest market data shown on this terminal.
+              {' '}Screener as-of <strong style={{ fontFamily: 'monospace' }}>{screenerAsOf}</strong>
+              {' · '}Terminal as-of <strong style={{ fontFamily: 'monospace' }}>{terminalAsOf}</strong>.
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* 🌟 Newbie Action Box (Actionable Wealth Decision Engine) */}
+      {/* Newbie Action Box (Actionable Wealth Decision Engine) */}
       <div style={{
         background: actionVerdict.bg,
         border: `1px solid ${actionVerdict.border}`,
@@ -680,26 +797,26 @@ export const ChartTab: React.FC<ChartTabProps> = ({
           gap: '0.4rem',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>Safe Buy Zone:</span>
+            <span style={{ color: 'var(--text-secondary)' }}>Technical Entry Range:</span>
             <strong style={{ color: '#38bdf8' }}>
               Rp {safeEntryLow.toLocaleString()} – Rp {safeEntryHigh.toLocaleString()}
             </strong>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>Upside Target ({Number(targetGainPct) >= 0 ? `+${targetGainPct}%` : `${targetGainPct}%`}):</span>
+            <span style={{ color: 'var(--text-secondary)' }}>Upper Technical Target ({Number(targetGainPct) >= 0 ? `+${targetGainPct}%` : `${targetGainPct}%`}):</span>
             <strong style={{ color: '#10b981' }}>
               Rp {profitTarget.toLocaleString()}
             </strong>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>Risk Floor / Cut-Loss ({Number(stopLossPct) >= 0 ? `+${stopLossPct}%` : `${stopLossPct}%`}):</span>
+            <span style={{ color: 'var(--text-secondary)' }}>Technical Invalidation Level ({Number(stopLossPct) >= 0 ? `+${stopLossPct}%` : `${stopLossPct}%`}):</span>
             <strong style={{ color: '#ef4444' }}>
               Rp {stopLoss.toLocaleString()}
             </strong>
           </div>
         </div>
 
-        {/* 3. Smart Money Footprint & Fundamentals */}
+        {/* 3. Foreign Flow & Fundamentals */}
         <div style={{
           background: 'rgba(15, 23, 42, 0.6)',
           border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -710,9 +827,22 @@ export const ChartTab: React.FC<ChartTabProps> = ({
           gap: '0.4rem',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>Institutional Flow:</span>
-            <strong style={{ color: netForeign >= 0 ? '#10b981' : '#ef4444' }}>
-              {netForeign >= 0 ? `+Rp ${(netForeign * priceNum / 1e9).toFixed(1)}B Inflow` : `-Rp ${(Math.abs(netForeign) * priceNum / 1e9).toFixed(1)}B Outflow`}
+            <span style={{ color: 'var(--text-secondary)' }}>Foreign Flow:</span>
+            <strong
+              style={{
+                color:
+                  netForeign == null
+                    ? '#94a3b8'
+                    : netForeign >= 0
+                      ? '#10b981'
+                      : '#ef4444',
+              }}
+            >
+              {netForeign == null || !Number.isFinite(priceNum) || priceNum <= 0
+                ? '—'
+                : netForeign >= 0
+                  ? `+Rp ${((netForeign * priceNum) / 1e9).toFixed(1)}B Inflow`
+                  : `-Rp ${((Math.abs(netForeign) * priceNum) / 1e9).toFixed(1)}B Outflow`}
             </strong>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem' }}>
@@ -871,19 +1001,19 @@ export const ChartTab: React.FC<ChartTabProps> = ({
 
         <div className="glass-card">
           <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Building size={18} style={{ color: 'var(--accent-purple)' }} /> Institutional Foreign Flow Footprint
+            <Building size={18} style={{ color: 'var(--accent-purple)' }} /> Foreign Flow Footprint
           </h3>
           <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: 1.8 }}>
             <div>
               <strong style={{ color: '#fff' }}>Foreign Buy:</strong>{' '}
               <span className="numeric" style={{ color: 'var(--accent-green)' }}>
-                {(foreignBuy / 1000000).toFixed(2)}M shares
+                {foreignBuyN == null ? '—' : `${(foreignBuyN / 1000000).toFixed(2)}M shares`}
               </span>
             </div>
             <div>
               <strong style={{ color: '#fff' }}>Foreign Sell:</strong>{' '}
               <span className="numeric" style={{ color: 'var(--accent-red)' }}>
-                {(foreignSell / 1000000).toFixed(2)}M shares
+                {foreignSellN == null ? '—' : `${(foreignSellN / 1000000).toFixed(2)}M shares`}
               </span>
             </div>
             <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
@@ -893,19 +1023,33 @@ export const ChartTab: React.FC<ChartTabProps> = ({
                 style={{
                   fontWeight: 700,
                   fontSize: '1.05rem',
-                  color: netForeign >= 0 ? 'var(--accent-green)' : 'var(--accent-red)',
+                  color:
+                    netForeign == null
+                      ? '#94a3b8'
+                      : netForeign >= 0
+                        ? 'var(--accent-green)'
+                        : 'var(--accent-red)',
                 }}
               >
-                {netForeign >= 0 ? '+' : ''}{(netForeign / 1000000).toFixed(2)}M shares ({netForeign >= 0 ? 'Accumulation' : 'Distribution'})
+                {netForeign == null
+                  ? '—'
+                  : `${netForeign >= 0 ? '+' : ''}${(netForeign / 1000000).toFixed(2)}M shares (${
+                      netForeign >= 0 ? 'Foreign Inflow' : 'Foreign Outflow'
+                    })`}
               </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Institutional Block Tape & Whale Order Detection Panel */}
-      <div className="glass-card" style={{ padding: '1.5rem', marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        {/* Header with Title, Live Badge, and Filter Pills */}
+      {/* Verified Aggregate Market Flow Panel */}
+      <div className="glass-card" style={{
+        padding: '1.5rem',
+        marginTop: '1.5rem',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1.25rem',
+      }}>
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -916,229 +1060,260 @@ export const ChartTab: React.FC<ChartTabProps> = ({
           paddingBottom: '1rem',
         }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.25rem' }}>
-              <Radio size={22} style={{ color: '#a855f7' }} />
-              <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#f8fafc' }}>
-                Institutional Block Tape & Whale Order Detection
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.6rem',
+              marginBottom: '0.25rem',
+            }}>
+              <Radio size={22} style={{ color: '#38bdf8' }} />
+              <h3 style={{
+                margin: 0,
+                fontSize: '1.2rem',
+                fontWeight: 800,
+                color: '#f8fafc',
+              }}>
+                Verified Market Flow
               </h3>
               <span style={{
                 padding: '0.2rem 0.6rem',
                 borderRadius: '12px',
-                background: 'rgba(168, 85, 247, 0.2)',
-                border: '1px solid rgba(168, 85, 247, 0.4)',
-                color: '#c084fc',
+                background: brokerBlocksAvailable
+                  ? 'rgba(16, 185, 129, 0.15)'
+                  : 'rgba(234, 179, 8, 0.15)',
+                border: brokerBlocksAvailable
+                  ? '1px solid rgba(16, 185, 129, 0.35)'
+                  : '1px solid rgba(234, 179, 8, 0.35)',
+                color: brokerBlocksAvailable ? '#34d399' : '#facc15',
                 fontSize: '0.72rem',
                 fontWeight: 800,
                 letterSpacing: '0.5px',
               }}>
-                WHALE RADAR LIVE
+                {brokerBlocksAvailable ? 'BROKER DETAIL AVAILABLE' : 'BROKER ATTRIBUTION UNAVAILABLE'}
               </span>
             </div>
-            <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8' }}>
-              Live institutional prints filtering out retail noise. Tracks who is absorbing inventory ({activeTicker}).
+
+            <p style={{
+              margin: 0,
+              fontSize: '0.85rem',
+              color: '#94a3b8',
+              maxWidth: '850px',
+            }}>
+              Verified aggregate market-flow data for {activeTicker}.
+              Individual buyer/seller broker attribution is not inferred when
+              transaction-level broker data is unavailable.
             </p>
           </div>
-
-          {/* Filter Pills */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <button
-              onClick={() => setWhaleFilter('whales_only')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.45rem 0.85rem',
-                borderRadius: '8px',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                border: whaleFilter === 'whales_only' ? '1px solid #a855f7' : '1px solid rgba(255, 255, 255, 0.1)',
-                background: whaleFilter === 'whales_only' ? 'rgba(168, 85, 247, 0.25)' : 'rgba(255, 255, 255, 0.03)',
-                color: whaleFilter === 'whales_only' ? '#c084fc' : '#9ca3af',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <span>🐋 Whales Only (≥ Rp 500M)</span>
-            </button>
-
-            <button
-              onClick={() => setWhaleFilter('all')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.4rem',
-                padding: '0.45rem 0.85rem',
-                borderRadius: '8px',
-                fontSize: '0.8rem',
-                fontWeight: 700,
-                cursor: 'pointer',
-                border: whaleFilter === 'all' ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.1)',
-                background: whaleFilter === 'all' ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.03)',
-                color: whaleFilter === 'all' ? '#38bdf8' : '#9ca3af',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <span>All Block Trades ({blockTrades.length})</span>
-            </button>
-          </div>
         </div>
 
-        {/* Summary KPIs Row */}
+        {/* Aggregate Market KPIs */}
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
           gap: '1rem',
         }}>
-          <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '10px', padding: '0.85rem 1rem' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>Total Whale Volume Today</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#facc15' }}>
-              Rp {(totalWhaleValue / 1e9).toFixed(2)}B
+          <div style={{
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: '10px',
+            padding: '0.85rem 1rem',
+          }}>
+            <div style={{
+              fontSize: '0.75rem',
+              color: 'var(--text-secondary)',
+              marginBottom: '0.2rem',
+            }}>
+              Total Turnover
             </div>
-            <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>Orders ≥ Rp 500M or 2,000 lots</div>
+            <div style={{
+              fontSize: '1.2rem',
+              fontWeight: 800,
+              color: '#f8fafc',
+            }}>
+              {fmtRpB(marketFlow.turnoverRp)}
+            </div>
           </div>
 
-          <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '10px', padding: '0.85rem 1rem' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>Smart Accumulation Ratio</div>
-            {smartBuyPercent !== null ? (
-              <>
-                <div style={{ fontSize: '1.25rem', fontWeight: 800, color: smartBuyPercent >= 60 ? '#10b981' : smartBuyPercent <= 40 ? '#ef4444' : '#f8fafc' }}>
-                  {smartBuyPercent}% Institutional
-                </div>
-                <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-                  {smartBuyPercent >= 60 ? 'Heavy institutional buying' : 'Distribution / Mixed'}
-                </div>
-              </>
-            ) : (
-              <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#64748b' }}>—</div>
-            )}
+          <div style={{
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: '10px',
+            padding: '0.85rem 1rem',
+          }}>
+            <div style={{
+              fontSize: '0.75rem',
+              color: 'var(--text-secondary)',
+              marginBottom: '0.2rem',
+            }}>
+              VWAP
+            </div>
+            <div style={{
+              fontSize: '1.2rem',
+              fontWeight: 800,
+              color: '#38bdf8',
+            }}>
+              {marketFlow.vwap != null && marketFlow.vwap > 0
+                ? `Rp ${marketFlow.vwap.toLocaleString()}`
+                : '—'}
+            </div>
           </div>
 
-          <div style={{ background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: '10px', padding: '0.85rem 1rem' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>Largest Single Whale Block</div>
-            {largestTrade ? (
-              <>
-                <div style={{ fontSize: '1.15rem', fontWeight: 800, color: '#38bdf8' }}>
-                  Rp {(largestTrade.valueRp / 1e9).toFixed(2)}B
-                </div>
-                <div style={{ fontSize: '0.72rem', color: '#cbd5e1' }}>
-                  {largestTrade.lots.toLocaleString()} lots @ Rp {largestTrade.price.toLocaleString()} ({largestTrade.buyerBroker} &rarr; {largestTrade.sellerBroker})
-                </div>
-              </>
-            ) : (
-              <div style={{ fontSize: '0.9rem', color: '#64748b' }}>—</div>
-            )}
+          <div style={{
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: '10px',
+            padding: '0.85rem 1rem',
+          }}>
+            <div style={{
+              fontSize: '0.75rem',
+              color: 'var(--text-secondary)',
+              marginBottom: '0.2rem',
+            }}>
+              Non-Regular Value
+            </div>
+            <div style={{
+              fontSize: '1.2rem',
+              fontWeight: 800,
+              color: '#facc15',
+            }}>
+              {fmtRpB(marketFlow.nonRegularValueRp)}
+            </div>
+            <div style={{
+              fontSize: '0.7rem',
+              color: '#94a3b8',
+              marginTop: '0.2rem',
+            }}>
+              {fmtCount(marketFlow.nonRegularFrequency)} frequency
+            </div>
+          </div>
+
+          <div style={{
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: '10px',
+            padding: '0.85rem 1rem',
+          }}>
+            <div style={{
+              fontSize: '0.75rem',
+              color: 'var(--text-secondary)',
+              marginBottom: '0.2rem',
+            }}>
+              Regular Volume
+            </div>
+            <div style={{
+              fontSize: '1.2rem',
+              fontWeight: 800,
+              color: '#f8fafc',
+            }}>
+              {fmtSharesM(marketFlow.regularVolume)}
+            </div>
+          </div>
+
+          <div style={{
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: '10px',
+            padding: '0.85rem 1rem',
+          }}>
+            <div style={{
+              fontSize: '0.75rem',
+              color: 'var(--text-secondary)',
+              marginBottom: '0.2rem',
+            }}>
+              Foreign Buy
+            </div>
+            <div style={{
+              fontSize: '1.2rem',
+              fontWeight: 800,
+              color: '#34d399',
+            }}>
+              {fmtSharesM(marketFlow.foreignBuy)}
+            </div>
+          </div>
+
+          <div style={{
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: '10px',
+            padding: '0.85rem 1rem',
+          }}>
+            <div style={{
+              fontSize: '0.75rem',
+              color: 'var(--text-secondary)',
+              marginBottom: '0.2rem',
+            }}>
+              Foreign Sell
+            </div>
+            <div style={{
+              fontSize: '1.2rem',
+              fontWeight: 800,
+              color: '#f87171',
+            }}>
+              {fmtSharesM(marketFlow.foreignSell)}
+            </div>
+          </div>
+
+          <div style={{
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: '10px',
+            padding: '0.85rem 1rem',
+          }}>
+            <div style={{
+              fontSize: '0.75rem',
+              color: 'var(--text-secondary)',
+              marginBottom: '0.2rem',
+            }}>
+              Net Foreign Flow
+            </div>
+            <div style={{
+              fontSize: '1.2rem',
+              fontWeight: 800,
+              color:
+                marketFlow.netForeignRp == null
+                  ? '#94a3b8'
+                  : marketFlow.netForeignRp >= 0
+                    ? '#34d399'
+                    : '#f87171',
+            }}>
+              {fmtRpB(marketFlow.netForeignRp)}
+            </div>
           </div>
         </div>
 
-        {/* Trade Stream Table */}
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                <th style={{ padding: '0.65rem 0.5rem' }}>Time</th>
-                <th style={{ padding: '0.65rem 0.5rem' }}>Price</th>
-                <th style={{ padding: '0.65rem 0.5rem' }}>Lots</th>
-                <th style={{ padding: '0.65rem 0.5rem' }}>Value (IDR)</th>
-                <th style={{ padding: '0.65rem 0.5rem' }}>Buyer (Broker)</th>
-                <th style={{ padding: '0.65rem 0.5rem' }}>Seller (Broker)</th>
-                <th style={{ padding: '0.65rem 0.5rem', textAlign: 'right' }}>Smart Money Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTrades.map((trade: BlockTrade) => {
-                let badgeStyle = {
-                  label: 'WHALE ACCUMULATION',
-                  color: '#34d399',
-                  bg: 'rgba(16, 185, 129, 0.2)',
-                  border: 'rgba(16, 185, 129, 0.4)',
-                };
-                if (trade.tradeType === 'WHALE_DUMP') {
-                  badgeStyle = {
-                    label: 'WHALE DUMP (INTO RETAIL)',
-                    color: '#f87171',
-                    bg: 'rgba(239, 68, 68, 0.2)',
-                    border: 'rgba(239, 68, 68, 0.4)',
-                  };
-                } else if (trade.tradeType === 'BLOCK_CROSSING') {
-                  badgeStyle = {
-                    label: 'INSTITUTIONAL CROSSING',
-                    color: '#facc15',
-                    bg: 'rgba(234, 179, 8, 0.2)',
-                    border: 'rgba(234, 179, 8, 0.4)',
-                  };
-                }
+        {!brokerBlocksAvailable && (
+          <div style={{
+            padding: '0.8rem 1rem',
+            borderRadius: '8px',
+            background: 'rgba(234, 179, 8, 0.07)',
+            border: '1px solid rgba(234, 179, 8, 0.18)',
+            color: '#cbd5e1',
+            fontSize: '0.75rem',
+            lineHeight: 1.5,
+          }}>
+            Broker-level transaction tape tidak tersedia untuk sesi ini.
+            Dashboard tidak mengarang buyer/seller broker, whale classification,
+            atau smart-accumulation ratio. Hanya aggregate market flow yang
+            ditampilkan.
+          </div>
+        )}
 
-                return (
-                  <tr
-                    key={trade.id}
-                    style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.03)' }}
-                    className="table-row-hover"
-                  >
-                    <td style={{ padding: '0.75rem 0.5rem', color: '#94a3b8', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.8rem' }}>
-                      {trade.time}
-                    </td>
-                    <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700, color: '#f8fafc' }}>
-                      Rp {trade.price.toLocaleString()}
-                    </td>
-                    <td style={{ padding: '0.75rem 0.5rem', fontWeight: 600, color: trade.isWhale ? '#facc15' : '#cbd5e1' }}>
-                      {trade.lots.toLocaleString()} lots
-                    </td>
-                    <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700, color: trade.isWhale ? '#a855f7' : '#94a3b8' }}>
-                      Rp {(trade.valueRp / 1e9).toFixed(2)}B
-                    </td>
-                    <td style={{ padding: '0.75rem 0.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <span style={{
-                          padding: '0.15rem 0.4rem',
-                          borderRadius: '4px',
-                          fontSize: '0.75rem',
-                          fontWeight: 800,
-                          background: trade.buyerType === 'INSTITUTIONAL' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)',
-                          color: trade.buyerType === 'INSTITUTIONAL' ? '#34d399' : '#f87171',
-                        }}>
-                          {trade.buyerBroker}
-                        </span>
-                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                          {trade.buyerName}
-                        </span>
-                      </div>
-                    </td>
-                    <td style={{ padding: '0.75rem 0.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <span style={{
-                          padding: '0.15rem 0.4rem',
-                          borderRadius: '4px',
-                          fontSize: '0.75rem',
-                          fontWeight: 800,
-                          background: trade.sellerType === 'INSTITUTIONAL' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)',
-                          color: trade.sellerType === 'INSTITUTIONAL' ? '#34d399' : '#f87171',
-                        }}>
-                          {trade.sellerBroker}
-                        </span>
-                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                          {trade.sellerName}
-                        </span>
-                      </div>
-                    </td>
-                    <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right' }}>
-                      <span style={{
-                        padding: '0.2rem 0.55rem',
-                        borderRadius: '6px',
-                        fontSize: '0.7rem',
-                        fontWeight: 800,
-                        color: badgeStyle.color,
-                        background: badgeStyle.bg,
-                        border: `1px solid ${badgeStyle.border}`,
-                        letterSpacing: '0.4px',
-                      }}>
-                        {badgeStyle.label}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div style={{
+          padding: '0.8rem 1rem',
+          borderRadius: '8px',
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid rgba(255,255,255,0.05)',
+          fontSize: '0.75rem',
+          color: '#94a3b8',
+        }}>
+          Non-regular volume:{' '}
+          {marketFlow.nonRegularVolume == null
+            ? '—'
+            : `${marketFlow.nonRegularVolume.toLocaleString()} shares`}
+          {' · '}
+          Non-regular frequency: {fmtCount(marketFlow.nonRegularFrequency)}
+          {' · '}
+          Broker transaction tape: {brokerBlocksAvailable ? 'available' : 'not available'}
         </div>
       </div>
     </div>

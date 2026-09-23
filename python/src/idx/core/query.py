@@ -53,7 +53,9 @@ def query_dataset(
         base_dir: Optional store root override (for tests)
 
     Returns:
-        pandas DataFrame of matching rows.
+        pandas DataFrame of matching rows, ordered chronologically by ``Date``
+        when that column is available. When ``limit`` is set, the *latest*
+        ``limit`` rows by Date are returned (still ascending).
     """
     pattern = _dataset_glob(dataset, base_dir)
 
@@ -69,17 +71,44 @@ def query_dataset(
     if where:
         conds.append(f"({where})")
     where_clause = f"WHERE {' AND '.join(conds)}" if conds else ""
-    limit_clause = f"LIMIT {int(limit)}" if limit else ""
 
-    query = f"""
-        SELECT {columns}
-        FROM read_parquet(['{pattern}'], filename = true)
-        {where_clause}
-        ORDER BY 1
-        {limit_clause}
-    """
-    log.debug("DuckDB query: %s", " ".join(query.split()))
-    return sql(query)
+    # Never ORDER BY 1 — first column is often a row index ("No"), not Date.
+    if limit is not None:
+        # Ensure Date is available for latest-N selection even if caller omitted it.
+        col_list = [c.strip() for c in columns.split(",")] if columns.strip() != "*" else []
+        if columns.strip() == "*" or "Date" in col_list:
+            select_cols = columns
+            drop_date = False
+        else:
+            select_cols = f"Date, {columns}"
+            drop_date = True
+        query = f"""
+            SELECT * FROM (
+                SELECT {select_cols}
+                FROM read_parquet(['{pattern}'], filename = true)
+                {where_clause}
+                ORDER BY Date DESC
+                LIMIT {int(limit)}
+            ) AS _q
+            ORDER BY Date ASC
+        """
+        log.debug("DuckDB query: %s", " ".join(query.split()))
+        df = sql(query)
+        if drop_date and "Date" in df.columns:
+            df = df.drop(columns=["Date"])
+    else:
+        query = f"""
+            SELECT {columns}
+            FROM read_parquet(['{pattern}'], filename = true)
+            {where_clause}
+            ORDER BY Date ASC
+        """
+        log.debug("DuckDB query: %s", " ".join(query.split()))
+        df = sql(query)
+
+    if "Date" in df.columns and len(df) > 1:
+        df = df.sort_values("Date", kind="mergesort").reset_index(drop=True)
+    return df
 
 
 def available_datasets():

@@ -11,15 +11,18 @@ import {
   Zap, 
   RotateCw,
   Sparkles,
-  Award
+  Award,
+  Clock
 } from 'lucide-react';
 import type { Company, StealthAnomaly, DividendOpportunity } from '../types';
-import { fetchStealthAccumulation, fetchDividendScreen, fetchDailyBriefing, fetchBrokerFlow } from '../services/api';
+import { fetchStealthAccumulation, fetchDividendScreen, fetchDailyBriefing } from '../services/api';
 import { DailyBriefingModal } from './DailyBriefingModal';
+import { formatMarketDateLabel, parseMarketDateKey } from '../utils/marketAsOf';
 
 
 interface AlphaHubProps {
   companies: Company[];
+  screenerLastUpdated?: string | null;
   onSelectStock: (ticker: string) => void;
   onOpenMemo: (company: Company) => void;
   isStarred: (code: string) => boolean;
@@ -28,6 +31,7 @@ interface AlphaHubProps {
 
 export const AlphaHub: React.FC<AlphaHubProps> = ({
   companies,
+  screenerLastUpdated = null,
   onSelectStock,
   onOpenMemo,
   isStarred,
@@ -50,23 +54,8 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
         const data = await fetchDailyBriefing();
         setBriefingData(data);
       } catch (e) {
-        console.warn('Failed to load briefing from backend, attempting live broker flow:', e);
-        try {
-          const brokerFlow = await fetchBrokerFlow();
-          setBriefingData({
-            trade_date: new Date().toISOString().split('T')[0],
-            stealth_accumulation: { anomalies: stealthAnomalies },
-            foreign_flow_radar: companies.slice(0, 5),
-            composite_alpha_rankings: companies.slice(0, 5).map((c) => ({
-              StockCode: c.code,
-              ROE: c.roe,
-              PER: c.per,
-            })),
-            bandarmology_summary: brokerFlow?.summary || {},
-          });
-        } catch {
-          setBriefingData(null);
-        }
+        console.warn('Failed to load briefing from backend:', e);
+        setBriefingData(null);
       } finally {
         setBriefingLoading(false);
       }
@@ -86,18 +75,25 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
         setStealthAnomalies(stealthRes.anomalies);
       }
       if (Array.isArray(divRes)) {
-        setDividendOpps(divRes.map((d: any) => ({
-          StockCode: d.Ticker || d.code || d.StockCode,
-          StockName: d.Name || d.name || d.StockName,
-          Price: Number(d.Price ?? d.price ?? 0),
-          DPS: Number(d.DPS_IDR ?? d.dps ?? 0),
-          DividendYield: Number(d['Yield%'] ?? d.yield ?? 0),
-          CumDate: d.CumDate || d.cum_date || '—',
-          ExDate: d.ExDate || d.ex_date || '—',
-          PayoutRatio: Number(d['DPR%'] ?? d.payout_ratio ?? 0),
-          TrapScore: Number(d.TrapScore ?? d.trap_score ?? 25),
-          Recommendation: d.Verdict || 'BUY',
-        })));
+        setDividendOpps(divRes.map((d: any) => {
+          const price = Number(d.Price ?? d.price);
+          const dps = Number(d.DPS_IDR ?? d.dps);
+          const yld = Number(d['Yield%'] ?? d.yield);
+          const payout = Number(d['DPR%'] ?? d.payout_ratio);
+          const trap = Number(d.TrapScore ?? d.trap_score);
+          return {
+            StockCode: d.Ticker || d.code || d.StockCode,
+            StockName: d.Name || d.name || d.StockName,
+            Price: Number.isFinite(price) ? price : undefined,
+            DPS: Number.isFinite(dps) ? dps : 0,
+            DividendYield: Number.isFinite(yld) ? yld : 0,
+            CumDate: d.CumDate || d.cum_date || '—',
+            ExDate: d.ExDate || d.ex_date || '—',
+            PayoutRatio: Number.isFinite(payout) ? payout : undefined,
+            TrapScore: Number.isFinite(trap) ? trap : undefined,
+            Recommendation: d.Verdict || d.recommendation || undefined,
+          };
+        }));
       }
     } catch (e) {
       console.warn('Failed to load alpha intelligence', e);
@@ -111,17 +107,13 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
   }, []);
 
   // Top Action Cards computation
-  const topSmartMoney = useMemo(() => {
-    return stealthAnomalies.filter((a) => a.Signal === 'STEALTH_ACCUMULATION').slice(0, 3);
-  }, [stealthAnomalies]);
+  const topSmartMoney = useMemo<StealthAnomaly[]>(() => [], []);
 
   const topDividends = useMemo(() => {
     return dividendOpps.filter((d) => (d.TrapScore ?? 0) <= 35 && d.DividendYield >= 5.0).slice(0, 3);
   }, [dividendOpps]);
 
-  const topTraps = useMemo(() => {
-    return stealthAnomalies.filter((a) => a.Signal === 'RETAIL_TRAP').slice(0, 3);
-  }, [stealthAnomalies]);
+  const topTraps = useMemo<StealthAnomaly[]>(() => [], []);
 
   // Top 3 High-Conviction Champion Compounders auto-ranker
   const topChampions = useMemo(() => {
@@ -130,78 +122,83 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
     const scored = companies.map((c) => {
       const divMatch = dividendOpps.find((d) => d.StockCode === c.code);
       const stealthMatch = stealthAnomalies.find((a) => a.StockCode === c.code);
-      const roe = c.roe ?? 0;
-      const yieldPct = c.yield ?? divMatch?.DividendYield ?? 0;
-      const pbv = c.pbv ?? c.price_bv ?? 0;
-      const price = c.price ?? c.previous_price ?? divMatch?.Price ?? 0;
-      const chg = c.daily_change ?? (c.previous_price && c.price ? c.price - c.previous_price : 0);
-      const chgPct = (c as any).daily_change_pct ?? stealthMatch?.PriceChangePct ?? (c.previous_price && c.previous_price > 0 ? (chg / c.previous_price) * 100 : 0);
+      const roeRaw = c.roe;
+      const yieldRaw = c.yield ?? divMatch?.DividendYield;
+      const pbvRaw = c.price_bv;
+      const roe = typeof roeRaw === 'number' && Number.isFinite(roeRaw) ? roeRaw : null;
+      const yieldPct = typeof yieldRaw === 'number' && Number.isFinite(yieldRaw) ? yieldRaw : null;
+      const pbv = typeof pbvRaw === 'number' && Number.isFinite(pbvRaw) ? pbvRaw : null;
+      const closeRaw = c.close ?? c.previous_price ?? divMatch?.Price;
+      const price = closeRaw == null ? Number.NaN : Number(closeRaw);
+      const previousPrice = Number(c.previous_price);
+      const dailyChangeNum =
+        c.daily_change == null ? Number.NaN : Number(c.daily_change);
+      const chg = Number.isFinite(dailyChangeNum)
+        ? dailyChangeNum
+        : Number.isFinite(price) && Number.isFinite(previousPrice)
+          ? price - previousPrice
+          : Number.NaN;
+      const chgPct = (c as any).daily_change_pct ?? (c as any).change_pct ?? stealthMatch?.PriceChangePct ?? (previousPrice > 0 && Number.isFinite(chg) ? (chg / previousPrice) * 100 : Number.NaN);
 
-      const isTrap = stealthMatch?.Signal === 'RETAIL_TRAP';
-      const trapScore = divMatch?.TrapScore ?? 25;
-      if (price <= 0 || isTrap || trapScore > 65) {
+      const trapScore = typeof divMatch?.TrapScore === 'number' && Number.isFinite(divMatch.TrapScore)
+        ? divMatch.TrapScore
+        : null;
+      // Exclude missing/invalid prices — do not treat null close as 0.
+      if (!Number.isFinite(price) || price <= 0 || (trapScore != null && trapScore > 65)) {
         return null;
       }
 
       let score = 0;
-      // 1. High ROE (cash generator): up to 35 pts
-      if (roe >= 20) score += 35;
-      else if (roe >= 15) score += 28;
-      else if (roe >= 10) score += 18;
-      else if (roe >= 5) score += 8;
+      // 1. High ROE (cash generator): up to 35 pts — missing ROE contributes 0 pts, not a fabricated ROE.
+      if (roe != null && roe >= 20) score += 35;
+      else if (roe != null && roe >= 15) score += 28;
+      else if (roe != null && roe >= 10) score += 18;
+      else if (roe != null && roe >= 5) score += 8;
 
       // 2. Safe Dividend Yield: up to 30 pts
-      if (yieldPct >= 6.0) score += 30;
-      else if (yieldPct >= 4.0) score += 24;
-      else if (yieldPct >= 2.5) score += 15;
+      if (yieldPct != null && yieldPct >= 6.0) score += 30;
+      else if (yieldPct != null && yieldPct >= 4.0) score += 24;
+      else if (yieldPct != null && yieldPct >= 2.5) score += 15;
 
-      // 3. Discount Valuation (PBV): up to 20 pts
-      if (pbv > 0 && pbv <= 1.5) score += 20;
-      else if (pbv > 0 && pbv <= 2.5) score += 14;
-      else if (pbv > 0 && pbv <= 4.0) score += 8;
+      // 3. Discount Valuation (PBV): up to 20 pts — missing PBV does not score.
+      if (pbv != null && pbv > 0 && pbv <= 1.5) score += 20;
+      else if (pbv != null && pbv > 0 && pbv <= 2.5) score += 14;
+      else if (pbv != null && pbv > 0 && pbv <= 4.0) score += 8;
 
       // 4. Blue Chip / Stability: 15 pts
       if (c.is_blue_chip) score += 15;
-
-      // 5. Smart Money Accumulation: +25 pts
-      const isStealth = stealthMatch?.Signal === 'STEALTH_ACCUMULATION';
-      if (isStealth) score += 25;
+      // Broker-level accumulation data is unavailable; no broker-attribution score is applied.
+      const isStealth = false;
 
       // 6. Pristine Dividend Trap Free: +15 pts
-      if (trapScore <= 30 && yieldPct >= 3.5) score += 15;
+      if (trapScore != null && trapScore <= 30 && yieldPct != null && yieldPct >= 3.5) score += 15;
 
-      // Generate wealth verdict & badges
+      // Generate fundamental badges & neutral verdict
       const badges: string[] = [];
-      if (isStealth) badges.push('Smart Money Inflow');
-      if (yieldPct >= 5.0) badges.push(`${yieldPct.toFixed(1)}% Safe Yield`);
-      if (roe >= 15.0) badges.push(`${roe.toFixed(1)}% ROE Cash Cow`);
+      if (yieldPct != null && yieldPct >= 5.0) badges.push(`${yieldPct.toFixed(1)}% Dividend Yield`);
+      if (roe != null && roe >= 15.0) badges.push(`${roe.toFixed(1)}% ROE`);
       if (c.is_blue_chip) badges.push('LQ45 Blue Chip');
-      if (pbv > 0 && pbv < 1.8) badges.push('Undervalued');
+      if (pbv != null && pbv > 0 && pbv < 1.8) badges.push('Lower PBV');
 
-      let verdict = 'Premier blue-chip compounder with robust capital returns and institutional backing.';
-      if (isStealth && yieldPct >= 4.0) {
-        verdict = 'Institutional heavyweights are quietly soaking up supply while paying a lucrative, safe dividend.';
-      } else if (isStealth) {
-        verdict = 'Heavy institutional stealth accumulation detected without retail hype. Prime early entry.';
-      } else if (yieldPct >= 7.0 && roe >= 15.0) {
-        verdict = 'Exceptional high-yield dividend gem backed by enormous return on equity and pristine cash coverage.';
-      } else if (roe >= 20.0) {
-        verdict = 'Elite compounding engine generating massive cash profits per rupiah invested.';
-      } else if (pbv > 0 && pbv < 1.2 && roe >= 12.0) {
-        verdict = 'Deep value opportunity trading beneath replacement cost with sustained profitability.';
+      let verdict = 'Fundamental profile combines profitability, valuation, dividend characteristics, and company classification.';
+      if (yieldPct != null && yieldPct >= 7.0 && roe != null && roe >= 15.0) {
+        verdict = 'High dividend yield combined with strong ROE. Review payout sustainability and earnings quality before making a decision.';
+      } else if (roe != null && roe >= 20.0) {
+        verdict = 'Strong ROE indicates high profitability relative to shareholder equity.';
+      } else if (pbv != null && pbv > 0 && pbv < 1.2 && roe != null && roe >= 12.0) {
+        verdict = 'Lower PBV combined with positive ROE may warrant further fundamental review.';
       }
-
       return {
         company: c,
         score,
         verdict,
         badges: badges.slice(0, 3),
-        roe,
-        yieldPct,
-        pbv,
+        roe: roe ?? 0,
+        yieldPct: yieldPct ?? 0,
+        pbv: pbv ?? 0,
         price,
-        chg,
-        chgPct,
+        chg: Number.isFinite(chg) ? chg : 0,
+        chgPct: Number.isFinite(Number(chgPct)) ? Number(chgPct) : 0,
         isStealth,
       };
     }).filter((item): item is NonNullable<typeof item> => item !== null);
@@ -222,23 +219,37 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
 
       // Category matching
       if (activeCategory === 'smart_money') {
-        return stealthAnomalies.some((a) => a.StockCode === c.code && a.Signal === 'STEALTH_ACCUMULATION');
+        return stealthAnomalies.some((a) => a.StockCode === c.code && a.Signal && a.Signal !== 'UNAVAILABLE');
       }
       if (activeCategory === 'dividends') {
         return (c.yield ?? 0) >= 4.0 || dividendOpps.some((d) => d.StockCode === c.code);
       }
       if (activeCategory === 'value') {
-        const pbv = c.pbv ?? c.price_bv ?? 99;
+        const pbv = c.price_bv ?? 99;
         const roe = c.roe ?? 0;
         return pbv < 1.5 && roe >= 12.0;
       }
       if (activeCategory === 'danger') {
-        return stealthAnomalies.some((a) => a.StockCode === c.code && a.Signal === 'RETAIL_TRAP');
+        return stealthAnomalies.some((a) => a.StockCode === c.code && a.Signal && a.Signal !== 'UNAVAILABLE');
       }
 
       return true;
     }).slice(0, 50); // Cap at 50 for ultra-fast rendering
   }, [companies, activeCategory, searchQuery, stealthAnomalies, dividendOpps]);
+
+  const snapshotAsOf = useMemo(
+    () => formatMarketDateLabel(screenerLastUpdated),
+    [screenerLastUpdated],
+  );
+
+  const companyPriceAsOf = useMemo(() => {
+    const keys = companies
+      .map((c) => parseMarketDateKey(c.price_date))
+      .filter((k): k is string => Boolean(k));
+    if (keys.length === 0) return null;
+    // Show the latest price_date present in the snapshot (still a data date, not clock time).
+    return keys.sort().at(-1) ?? null;
+  }, [companies]);
 
   return (
     <div className="alpha-hub" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -261,8 +272,36 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
             <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>Alpha Finder & Opportunity Hub</h2>
           </div>
           <p style={{ margin: 0, color: '#94a3b8', fontSize: '0.9rem', maxWidth: '650px', lineHeight: 1.5 }}>
-            Automated intelligence identifying what institutions are accumulating, which dividends are 100% safe, and which retail traps to avoid.
+            Automated screening across profitability, valuation, dividends, and available market-flow signals.
           </p>
+          {(snapshotAsOf || companyPriceAsOf) && (
+            <div
+              style={{
+                marginTop: '0.75rem',
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '0.75rem 1.25rem',
+                fontSize: '0.8rem',
+                color: '#94a3b8',
+              }}
+            >
+              {snapshotAsOf && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <Clock size={14} style={{ color: '#38bdf8' }} />
+                  <span>
+                    Screener snapshot as-of (data date):{' '}
+                    <strong style={{ color: '#e2e8f0', fontFamily: 'monospace' }}>{snapshotAsOf}</strong>
+                  </span>
+                </span>
+              )}
+              {companyPriceAsOf && (
+                <span>
+                  Company price as-of (data date):{' '}
+                  <strong style={{ color: '#e2e8f0', fontFamily: 'monospace' }}>{companyPriceAsOf}</strong>
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -355,7 +394,7 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
                 </span>
               </div>
               <p style={{ margin: 0, fontSize: '0.85rem', color: '#94a3b8' }}>
-                Algorithmic ranking uniting high cashflow ROE, safe dividend yields, institutional stealth accumulation, and deep value.
+                Algorithmic ranking combining ROE, dividend yield, valuation, and blue-chip classification.
               </p>
             </div>
 
@@ -502,7 +541,7 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
                       <div style={{ background: 'rgba(255, 255, 255, 0.04)', borderRadius: '6px', padding: '0.35rem', textAlign: 'center' }}>
                         <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>ROE</div>
                         <div style={{ fontSize: '0.8rem', fontWeight: 800, color: item.roe >= 15 ? '#10b981' : '#f8fafc' }}>
-                          {item.roe ? `${item.roe}%` : '—'}
+                          {item.roe ? `${item.roe.toFixed(2)}%` : '—'}
                         </div>
                       </div>
                       <div style={{ background: 'rgba(255, 255, 255, 0.04)', borderRadius: '6px', padding: '0.35rem', textAlign: 'center' }}>
@@ -514,7 +553,7 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
                       <div style={{ background: 'rgba(255, 255, 255, 0.04)', borderRadius: '6px', padding: '0.35rem', textAlign: 'center' }}>
                         <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>PBV</div>
                         <div style={{ fontSize: '0.8rem', fontWeight: 800, color: item.pbv > 0 && item.pbv <= 2 ? '#38bdf8' : '#f8fafc' }}>
-                          {item.pbv ? `${item.pbv}x` : '—'}
+                          {item.pbv ? `${item.pbv.toFixed(2)}x` : '—'}
                         </div>
                       </div>
                     </div>
@@ -598,7 +637,7 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
         gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
         gap: '1.25rem',
       }}>
-        {/* Smart Money Accumulation Card */}
+        {/* Flow Anomaly Card */}
         <div style={{
           background: 'rgba(15, 23, 42, 0.7)',
           border: '1px solid rgba(16, 185, 129, 0.3)',
@@ -614,7 +653,7 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{ fontSize: '1.2rem' }}>🟢</span>
                 <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#f8fafc' }}>
-                  Smart Money Accumulating
+                  Flow Anomaly
                 </h3>
               </div>
               <span style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399', fontWeight: 700 }}>
@@ -622,7 +661,7 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
               </span>
             </div>
             <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: '0 0 1rem', lineHeight: 1.4 }}>
-              Big institutional brokers are soaking up supply without letting prices rise yet. Perfect entry before a breakout.
+              Available flow data indicates an anomaly. Broker-level attribution is unavailable, so confirmation from price and volume is required.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -644,13 +683,20 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
                   >
                     <strong style={{ color: '#f8fafc', fontSize: '0.9rem' }}>{item.StockCode}</strong>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', color: '#34d399' }}>
-                      <span>Net +Rp {item.NetForeignFlowRpB || 1.2}B</span>
+                      <span>
+                        Net{' '}
+                        {item.NetForeignFlowRpB == null || !Number.isFinite(Number(item.NetForeignFlowRpB))
+                          ? '—'
+                          : `+Rp ${Number(item.NetForeignFlowRpB)}B`}
+                      </span>
                       <ArrowRight size={12} />
                     </div>
                   </div>
                 ))
               ) : (
-                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Scanning order book for stealth accumulation...</div>
+                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                  Attribution unavailable — no verified broker-participant flow anomalies.
+                </div>
               )}
             </div>
           </div>
@@ -669,7 +715,7 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
               cursor: 'pointer',
             }}
           >
-            View All Smart Money Picks &rarr;
+            View Flow Anomalies &rarr;
           </button>
         </div>
 
@@ -764,7 +810,7 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <span style={{ fontSize: '1.2rem' }}>🔴</span>
                 <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#f8fafc' }}>
-                  Retail Traps (Avoid)
+                  Price/Flow Divergence
                 </h3>
               </div>
               <span style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.2)', color: '#f87171', fontWeight: 700 }}>
@@ -772,7 +818,7 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
               </span>
             </div>
             <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: '0 0 1rem', lineHeight: 1.4 }}>
-              Stocks being aggressively pumped by retail while foreign and big institutional money are dumping inventory.
+              Price/flow divergence detected from the available dataset. Broker-level participant attribution is not available.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -794,13 +840,15 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
                   >
                     <strong style={{ color: '#f8fafc', fontSize: '0.9rem' }}>{item.StockCode}</strong>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', color: '#f87171' }}>
-                      <span>Retail Pump ({item.PriceChangePct > 0 ? `+${item.PriceChangePct}%` : `${item.PriceChangePct}%`})</span>
+                      <span>Divergence ({item.PriceChangePct > 0 ? `+${item.PriceChangePct}%` : `${item.PriceChangePct}%`})</span>
                       <ArrowRight size={12} />
                     </div>
                   </div>
                 ))
               ) : (
-                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>No aggressive retail distribution pumps detected.</div>
+                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                  Attribution unavailable — no verified participant-trap signals.
+                </div>
               )}
             </div>
           </div>
@@ -841,7 +889,7 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           {[
             { id: 'all', label: 'All Opportunities', icon: Compass },
-            { id: 'smart_money', label: 'Smart Money (Bandarmology)', icon: Zap },
+            { id: 'smart_money', label: 'Flow Anomaly', icon: Zap },
             { id: 'dividends', label: 'Cashflow Gems', icon: Coins },
             { id: 'value', label: 'Undervalued Quality', icon: TrendingUp },
             { id: 'danger', label: 'Danger Shield', icon: ShieldAlert },
@@ -921,23 +969,30 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
             {filteredList.map((c) => {
               const divMatch = dividendOpps.find((d) => d.StockCode === c.code);
               const stealthMatch = stealthAnomalies.find((a) => a.StockCode === c.code);
-              const price = c.price ?? c.previous_price ?? divMatch?.Price ?? 0;
-              const chg = c.daily_change ?? (c.previous_price && c.price ? c.price - c.previous_price : 0);
-              const chgPct = (c as any).daily_change_pct ?? stealthMatch?.PriceChangePct ?? (c.previous_price && c.previous_price > 0 ? (chg / c.previous_price) * 100 : 0);
+              const price = Number(c.close ?? c.previous_price ?? divMatch?.Price ?? Number.NaN);
+              const previousPrice = Number(c.previous_price);
+              const dailyChangeNum =
+                c.daily_change == null ? Number.NaN : Number(c.daily_change);
+              const chg = Number.isFinite(dailyChangeNum)
+                ? dailyChangeNum
+                : Number.isFinite(price) && Number.isFinite(previousPrice)
+                  ? price - previousPrice
+                  : 0;
+              const chgPct = (c as any).daily_change_pct ?? (c as any).change_pct ?? stealthMatch?.PriceChangePct ?? (previousPrice > 0 ? (chg / previousPrice) * 100 : 0);
               const starred = isStarred(c.code);
 
               // Plain English verdict
-              const isStealth = stealthAnomalies.some((a) => a.StockCode === c.code && a.Signal === 'STEALTH_ACCUMULATION');
-              const isTrap = stealthAnomalies.some((a) => a.StockCode === c.code && a.Signal === 'RETAIL_TRAP');
+              const isStealth = false;
+              const isTrap = false;
               const isGoodDiv = (c.yield ?? 0) >= 5.0;
 
               let verdictBadge = { text: 'Quality Compounder', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.15)' };
               if (isStealth) {
-                verdictBadge = { text: 'Smart Money Accumulation', color: '#34d399', bg: 'rgba(16, 185, 129, 0.2)' };
+                verdictBadge = { text: 'Flow Anomaly', color: '#34d399', bg: 'rgba(16, 185, 129, 0.2)' };
               } else if (isTrap) {
-                verdictBadge = { text: 'Retail Trap - Avoid', color: '#f87171', bg: 'rgba(239, 68, 68, 0.2)' };
+                verdictBadge = { text: 'Price/Flow Divergence', color: '#f87171', bg: 'rgba(239, 68, 68, 0.2)' };
               } else if (isGoodDiv) {
-                verdictBadge = { text: 'Safe Cashflow Gem', color: '#facc15', bg: 'rgba(234, 179, 8, 0.2)' };
+                verdictBadge = { text: 'Dividend Screen', color: '#facc15', bg: 'rgba(234, 179, 8, 0.2)' };
               }
 
               return (
@@ -982,7 +1037,7 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
                     </div>
                   </td>
                   <td style={{ padding: '0.85rem 0.5rem' }}>
-                    {price > 0 ? (
+                    {Number.isFinite(price) && price > 0 ? (
                       <>
                         <div style={{ fontWeight: 700, color: '#f8fafc' }}>
                           Rp {price.toLocaleString()}
@@ -1020,10 +1075,10 @@ export const AlphaHub: React.FC<AlphaHubProps> = ({
                     </span>
                   </td>
                   <td style={{ padding: '0.85rem 0.5rem', fontWeight: 600, color: (c.roe ?? 0) >= 15 ? '#10b981' : '#cbd5e1' }}>
-                    {c.roe ? `${c.roe}%` : '—'}
+                    {c.roe ? `${c.roe.toFixed(2)}%` : '—'}
                   </td>
                   <td style={{ padding: '0.85rem 0.5rem', color: '#cbd5e1' }}>
-                    {c.pbv ?? c.price_bv ? `${c.pbv ?? c.price_bv}x` : '—'}
+                    {c.price_bv ? `${Number(c.price_bv).toFixed(2)}x` : '—'}
                   </td>
                   <td style={{ padding: '0.85rem 0.5rem', fontWeight: 700, color: (c.yield ?? 0) >= 4 ? '#eab308' : '#94a3b8' }}>
                     {c.yield ? `${c.yield.toFixed(1)}%` : '—'}

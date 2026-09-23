@@ -1,6 +1,8 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Header } from './components/Header';
-import { AlphaHub } from './components/AlphaHub';
+import { ScreenerTab } from './components/ScreenerTab';
+import { BigMoneyTab } from './components/BigMoneyTab';
+import { TradingPlanTab } from './components/TradingPlanTab';
 import { useDashboardData } from './hooks/useDashboardData';
 import { useLiveStream } from './hooks/useLiveStream';
 import { useWatchlist } from './hooks/useWatchlist';
@@ -45,7 +47,7 @@ function parseRouteFromUrl(): { tab: TabType; ticker: string } {
   if (hash) {
     const [hashPath, hashQuery] = hash.split('?');
     if (hashPath) {
-      if (['opportunities', 'terminal', 'power_map', 'simulator', 'ingestion'].includes(hashPath)) {
+      if (['opportunities', 'terminal', 'power_map', 'big_money', 'simulator', 'trading_plan', 'ingestion'].includes(hashPath)) {
         tabParam = hashPath as TabType;
       } else if (/^[A-Za-z0-9]{4,5}$/.test(hashPath)) {
         tabParam = 'terminal';
@@ -60,7 +62,15 @@ function parseRouteFromUrl(): { tab: TabType; ticker: string } {
     }
   }
 
-  const validTabs: TabType[] = ['opportunities', 'terminal', 'power_map', 'simulator', 'ingestion'];
+  const validTabs: TabType[] = [
+    'opportunities',
+    'terminal',
+    'power_map',
+    'big_money',
+    'simulator',
+    'trading_plan',
+    'ingestion',
+  ];
   const tab = tabParam && validTabs.includes(tabParam) ? tabParam : 'opportunities';
   const ticker = (tickerParam || 'BBCA').toUpperCase();
 
@@ -77,15 +87,19 @@ function syncRouteToUrl(tab: TabType, ticker: string, replace = false) {
 
   // Automatically update document title for crisp browser bookmarks (Ctrl+D)
   if (tab === 'terminal') {
-    document.title = `${ticker.toUpperCase()} • IDX Smart Money Terminal`;
+    document.title = `${ticker.toUpperCase()} • RitelInsight Terminal`;
   } else if (tab === 'opportunities') {
-    document.title = 'Alpha Finder • IDX Smart Money';
+    document.title = 'Screener • RitelInsight';
   } else if (tab === 'power_map') {
-    document.title = 'Tycoons & Power Map • IDX Smart Money';
+    document.title = 'Tycoons & Power Map • RitelInsight';
   } else if (tab === 'simulator') {
-    document.title = 'Strategy Simulator • IDX Smart Money';
+    document.title = 'Strategy Lab • RitelInsight';
+  } else if (tab === 'big_money') {
+    document.title = 'Big Money • RitelInsight';
+  } else if (tab === 'trading_plan') {
+    document.title = 'Plan & Journal • RitelInsight';
   } else if (tab === 'ingestion') {
-    document.title = 'Data Ingestion & Backfill • IDX Smart Money';
+    document.title = 'Data Center • RitelInsight';
   }
 
   if (window.location.hash !== newHash) {
@@ -103,24 +117,7 @@ export const App: React.FC = () => {
   const [selectedTicker, setSelectedTicker] = useState<string>(initialRoute.ticker);
   const [memoCompany, setMemoCompany] = useState<Company | null>(null);
   const [isWatchlistOpen, setIsWatchlistOpen] = useState<boolean>(false);
-  const [alerts, setAlerts] = useState<LiveAlert[]>([
-    {
-      id: 'alert-1',
-      ticker: 'GOTO',
-      type: 'STEALTH_ACCUMULATION',
-      title: 'Stealth Accumulation Detected',
-      message: 'Tier-1 institutional brokers accumulated net +Rp 840M while price remained flat at Rp 50.',
-      timestamp: 'Today',
-    },
-    {
-      id: 'alert-2',
-      ticker: 'LABS',
-      type: 'RETAIL_TRAP',
-      title: 'Retail Distribution Trap',
-      message: 'Retail brokers pumped price +23.6% while foreign institutional capital aggressively distributed.',
-      timestamp: 'Today',
-    },
-  ]);
+  const [alerts] = useState<LiveAlert[]>([]);
 
   const { data, loading, error, reload } = useDashboardData();
   const { isConnected, lastEvent } = useLiveStream();
@@ -152,17 +149,11 @@ export const App: React.FC = () => {
       console.log('[WebSocket] Ingestion event received -> reloading dashboard data');
       reload();
     } else if (lastEvent.type === 'stealth_accumulation' && lastEvent.ticker) {
-      setAlerts((prev) => [
-        {
-          id: `alert-${Date.now()}`,
-          ticker: lastEvent.ticker!,
-          type: 'STEALTH_ACCUMULATION',
-          title: 'Stealth Accumulation',
-          message: `Institutional inflow detected on ${lastEvent.ticker}`,
-          timestamp: 'Just now',
-        },
-        ...prev,
-      ]);
+      // Do not surface stealth/institutional claims: broker attribution is unavailable.
+      console.log(
+        '[WebSocket] stealth_accumulation event ignored (attribution unavailable):',
+        lastEvent.ticker,
+      );
     }
   }, [lastEvent, reload]);
 
@@ -201,7 +192,7 @@ export const App: React.FC = () => {
       />
 
       <main className="main-container" style={{ padding: '1.5rem 2rem' }}>
-        {error && !data && (
+        {error && !data && activeTab !== 'opportunities' && (
           <div className="error-banner">
             <AlertTriangle size={48} />
             <h2>Data Unavailable</h2>
@@ -211,29 +202,25 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {loading && !data && (
+        {loading && !data && activeTab !== 'opportunities' && (
           <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
             <p style={{ fontSize: '1.2rem' }}>Loading quantitative intelligence...</p>
           </div>
         )}
 
+        {/* Production Screener does not require network_alpha dashboard blob */}
+        {activeTab === 'opportunities' && (
+          <ScreenerTab onSelectTicker={handleSelectStock} />
+        )}
+        {activeTab === 'big_money' && <BigMoneyTab selectedTicker={selectedTicker} />}
+        {activeTab === 'trading_plan' && <TradingPlanTab />}
+
         {data && (
           <Suspense fallback={<TabFallback />}>
-            {/* 1. Alpha Finder (Opportunities Hub) */}
-            {activeTab === 'opportunities' && (
-              <AlphaHub
-                companies={data.companies}
-                onSelectStock={handleSelectStock}
-                onOpenMemo={handleOpenMemo}
-                isStarred={isStarred}
-                onToggleStar={toggleStar}
-              />
-            )}
-
-            {/* 2. Stock Terminal (TradingView Charts & Indicators & Order Flow) */}
             {activeTab === 'terminal' && (
               <ChartTab
                 companies={data.companies}
+                screenerLastUpdated={data.last_updated}
                 selectedTicker={selectedTicker}
                 onSelectTicker={handleSelectTicker}
                 lastLiveEvent={lastEvent}
@@ -243,7 +230,6 @@ export const App: React.FC = () => {
               />
             )}
 
-            {/* 3. Tycoons & Power Map (Super-Insiders, Conglomerates, & UBO Graph) */}
             {activeTab === 'power_map' && (
               <PowerMapTab
                 companies={data.companies}
@@ -253,14 +239,12 @@ export const App: React.FC = () => {
               />
             )}
 
-            {/* 4. Strategy Simulator (Vectorized Backtester) */}
             {activeTab === 'simulator' && (
               <BacktesterTab
                 onSelectStock={handleSelectStock}
               />
             )}
 
-            {/* 5. Data Ingestion & Backfill Horizon Status */}
             {activeTab === 'ingestion' && (
               <IngestionTab
                 lastLiveEvent={lastEvent}
@@ -296,7 +280,7 @@ export const App: React.FC = () => {
         fontSize: '0.8rem',
       }}>
         <p style={{ margin: 0 }}>
-          Smart Money & Network Alpha Finder &copy; 2026 &bull; Designed for high-conviction decision making on the Indonesia Stock Exchange.
+          RitelInsight &copy; 2026 &bull; Decision support for Indonesia Stock Exchange market data (research use).
         </p>
       </footer>
     </div>

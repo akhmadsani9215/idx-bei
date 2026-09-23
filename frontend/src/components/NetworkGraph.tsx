@@ -115,9 +115,13 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
       (company.shareholders || []).slice(0, 6).forEach((sh: Shareholder, i: number) => {
         const id = `sh_${i}_${sh.name}`;
         const isCtrl = Boolean(sh.is_controller || sh.is_super_insider);
+        const pctLabel =
+          typeof sh.percentage === 'number' && Number.isFinite(sh.percentage)
+            ? `${sh.percentage.toFixed(1)}%`
+            : '—';
         nodes.add({
           id,
-          label: `${sh.name}\n(${sh.percentage.toFixed(1)}%)`,
+          label: `${sh.name}\n(${pctLabel})`,
           shape: 'box',
           shapeProperties: { borderRadius: 8 },
           level: isCtrl ? 0 : 1,
@@ -133,7 +137,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
         edges.add({
           from: id,
           to: rootId,
-          label: `${sh.percentage.toFixed(1)}%`,
+          label: pctLabel,
           arrows: 'to',
           color: { color: isCtrl ? 'rgba(245, 158, 11, 0.8)' : 'rgba(167, 139, 250, 0.6)' },
           font: { color: isCtrl ? '#fde047' : '#c4b5fd', size: 10, bold: true },
@@ -173,9 +177,13 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
 
       (company.subsidiaries || []).slice(0, 6).forEach((sub: Subsidiary, i: number) => {
         const id = `sub_${i}_${sub.name}`;
+        const pctLabel =
+          typeof sub.percentage === 'number' && Number.isFinite(sub.percentage)
+            ? `${sub.percentage.toFixed(1)}%`
+            : '—';
         nodes.add({
           id,
-          label: `${sub.name}\n(${sub.percentage.toFixed(1)}%)`,
+          label: `${sub.name}\n(${pctLabel})`,
           shape: 'box',
           shapeProperties: { borderRadius: 6 },
           level: 3,
@@ -190,7 +198,7 @@ export const NetworkGraph: React.FC<NetworkGraphProps> = ({
         edges.add({
           from: rootId,
           to: id,
-          label: `${sub.percentage.toFixed(1)}%`,
+          label: pctLabel,
           arrows: 'to',
           color: { color: 'rgba(244, 63, 94, 0.5)' },
           font: { color: '#fda4af', size: 9 },

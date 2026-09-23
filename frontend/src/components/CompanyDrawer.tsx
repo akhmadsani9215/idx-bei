@@ -165,9 +165,11 @@ export const CompanyDrawer: React.FC<CompanyDrawerProps> = ({
                     Controller
                   </span>
                 )}
-                <span className="numeric" style={{ fontWeight: 600 }}>
-                  {s.percentage.toFixed(2)}%
-                </span>
+                  <span className="numeric" style={{ fontWeight: 600 }}>
+                    {typeof s.percentage === 'number' && Number.isFinite(s.percentage)
+                      ? `${s.percentage.toFixed(2)}%`
+                      : '—'}
+                  </span>
               </div>
             </div>
           ))}
@@ -194,7 +196,9 @@ export const CompanyDrawer: React.FC<CompanyDrawerProps> = ({
                     {sub.bidang_usaha || 'Subsidiary'}
                   </span>
                   <span className="numeric" style={{ fontWeight: 600 }}>
-                    {sub.percentage.toFixed(1)}%
+                    {typeof sub.percentage === 'number' && Number.isFinite(sub.percentage)
+                      ? `${sub.percentage.toFixed(1)}%`
+                      : '—'}
                   </span>
                 </div>
               </div>

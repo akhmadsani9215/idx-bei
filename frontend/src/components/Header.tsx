@@ -1,5 +1,5 @@
 import React from 'react';
-import { Compass, CandlestickChart, Network, PlayCircle, Database, Star, Bell } from 'lucide-react';
+import { Compass, CandlestickChart, Network, PlayCircle, Database, Star, Bell, Landmark, ClipboardList } from 'lucide-react';
 import type { TabType } from '../types';
 
 interface HeaderProps {
@@ -22,11 +22,13 @@ export const Header: React.FC<HeaderProps> = ({
   unreadAlertsCount,
 }) => {
   const tabs: { id: TabType; label: string; icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }> }[] = [
-    { id: 'opportunities', label: 'Alpha Finder', icon: Compass },
+    { id: 'opportunities', label: 'Screener', icon: Compass },
     { id: 'terminal', label: 'Stock Terminal', icon: CandlestickChart },
+    { id: 'big_money', label: 'Big Money', icon: Landmark },
     { id: 'power_map', label: 'Tycoons & Power Map', icon: Network },
-    { id: 'simulator', label: 'Strategy Simulator', icon: PlayCircle },
-    { id: 'ingestion', label: 'Data Ingestion', icon: Database },
+    { id: 'simulator', label: 'Strategy Lab', icon: PlayCircle },
+    { id: 'trading_plan', label: 'Plan & Journal', icon: ClipboardList },
+    { id: 'ingestion', label: 'Data Center', icon: Database },
   ];
 
   return (
@@ -58,10 +60,10 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <span style={{ fontWeight: 800, fontSize: '1.05rem', color: '#f8fafc', letterSpacing: '-0.3px' }}>
-            IDX Smart Money
+            RitelInsight
           </span>
           <span style={{ fontSize: '0.7rem', color: '#38bdf8', fontWeight: 600 }}>
-            Alpha Terminal &bull; BEI
+            Alpha Terminal &bull; IDX data source
           </span>
         </div>
       </div>
@@ -163,7 +165,7 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </button>
 
-        {/* Live WebSocket Indicator */}
+        {/* Ops WebSocket — not market realtime */}
         <div
           id="wsBadge"
           style={{
@@ -173,24 +175,28 @@ export const Header: React.FC<HeaderProps> = ({
             fontSize: '0.75rem',
             padding: '0.35rem 0.65rem',
             borderRadius: '20px',
-            border: isConnected ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255, 255, 255, 0.1)',
-            background: isConnected ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 255, 255, 0.05)',
-            color: isConnected ? '#10b981' : '#9ca3af',
+            border: isConnected ? '1px solid rgba(56, 189, 248, 0.35)' : '1px solid rgba(255, 255, 255, 0.1)',
+            background: isConnected ? 'rgba(56, 189, 248, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+            color: isConnected ? '#38bdf8' : '#9ca3af',
             fontFamily: 'monospace',
             fontWeight: 600,
           }}
-          title={isConnected ? 'Live WebSocket Connected' : 'Live Feed Disconnected'}
+          title={
+            isConnected
+              ? 'Ops WebSocket connected (ingestion/events). Market realtime NOT_CONFIGURED.'
+              : 'Ops WebSocket disconnected. Market realtime NOT_CONFIGURED.'
+          }
         >
           <span
             style={{
               width: '7px',
               height: '7px',
               borderRadius: '50%',
-              background: isConnected ? '#10b981' : '#9ca3af',
-              boxShadow: isConnected ? '0 0 8px #10b981' : 'none',
+              background: isConnected ? '#38bdf8' : '#9ca3af',
+              boxShadow: isConnected ? '0 0 8px #38bdf8' : 'none',
             }}
           />
-          <span>{isConnected ? 'LIVE' : 'OFFLINE'}</span>
+          <span>{isConnected ? 'OPS WS' : 'WS OFF'}</span>
         </div>
       </div>
     </header>

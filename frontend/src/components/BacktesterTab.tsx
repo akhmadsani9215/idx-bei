@@ -20,6 +20,16 @@ interface BacktesterTabProps {
   onSelectStock: (ticker: string) => void;
 }
 
+/** Format a numeric metric; null/undefined → unavailable dash (never invent 0). */
+function fmtMetric(
+  value: number | null | undefined,
+  opts?: { suffix?: string; signed?: boolean },
+): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return '—';
+  const signed = opts?.signed ? (value > 0 ? '+' : '') : '';
+  return `${signed}${value}${opts?.suffix ?? ''}`;
+}
+
 export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) => {
   const [strategy, setStrategy] = useState<BacktestParams['strategy']>('foreign_flow');
   const [holdingDays, setHoldingDays] = useState<number>(20);
@@ -81,7 +91,7 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
   };
 
   useEffect(() => {
-    handleRun();
+    // Do not auto-run heavy backtests on mount — user must click Run.
   }, []);
 
   // Render or update equity curve chart
@@ -139,9 +149,27 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
   }, [result]);
 
   const metrics = result?.metrics;
+  const totalTrades = metrics?.total_trades ?? 0;
+  const tradesShown = result?.trades?.length ?? 0;
+  // CONTRACT: never display metrics.cagr_pct — it is unavailable and must not alias total return.
+  void metrics?.cagr_pct;
 
   return (
     <div className="backtester-tab" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div
+        style={{
+          background: 'rgba(234, 179, 8, 0.08)',
+          border: '1px solid rgba(234, 179, 8, 0.35)',
+          borderRadius: 12,
+          padding: '0.85rem 1rem',
+          color: '#fde68a',
+          fontSize: '0.82rem',
+        }}
+      >
+        Strategy Lab: historical metrics are descriptive only.
+        {' '}INSUFFICIENT OOS VALIDATION for all current strategies — do not treat positive results as proven profitability.
+        Close Pressure / Intraday / Big Money Follow remain UNAVAILABLE until data+engine exist.
+      </div>
       {/* Top Banner & Control Deck */}
       <div style={{
         background: 'rgba(15, 23, 42, 0.65)',
@@ -298,7 +326,7 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
         </div>
       )}
 
-      {/* KPI Cards */}
+      {/* KPI Cards — total_return_pct only; never label/display cagr_pct as CAGR */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
@@ -307,17 +335,17 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
         <div className="stat-card" style={{ background: 'rgba(15, 23, 42, 0.55)', padding: '1.25rem', borderRadius: '14px' }}>
           <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Total Strategy Return</div>
           <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '0.35rem', color: (metrics?.total_return_pct ?? 0) >= 0 ? '#10b981' : '#ef4444' }}>
-            {metrics?.total_return_pct !== undefined ? `${metrics.total_return_pct > 0 ? '+' : ''}${metrics.total_return_pct}%` : '—'}
+            {fmtMetric(metrics?.total_return_pct, { suffix: '%', signed: true })}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-            Cumulative portfolio return
+            Cumulative portfolio return (not CAGR)
           </div>
         </div>
 
         <div className="stat-card" style={{ background: 'rgba(15, 23, 42, 0.55)', padding: '1.25rem', borderRadius: '14px' }}>
           <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Sharpe Ratio</div>
           <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '0.35rem', color: '#38bdf8' }}>
-            {metrics?.sharpe_ratio !== undefined ? metrics.sharpe_ratio : '—'}
+            {fmtMetric(metrics?.sharpe_ratio)}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
             Risk-adjusted excess return
@@ -327,7 +355,9 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
         <div className="stat-card" style={{ background: 'rgba(15, 23, 42, 0.55)', padding: '1.25rem', borderRadius: '14px' }}>
           <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Max Drawdown</div>
           <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '0.35rem', color: '#ef4444' }}>
-            {metrics?.max_drawdown_pct !== undefined ? `-${Math.abs(metrics.max_drawdown_pct)}%` : '—'}
+            {metrics?.max_drawdown_pct != null
+              ? `-${Math.abs(metrics.max_drawdown_pct)}%`
+              : '—'}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
             Peak-to-trough decline
@@ -337,20 +367,22 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
         <div className="stat-card" style={{ background: 'rgba(15, 23, 42, 0.55)', padding: '1.25rem', borderRadius: '14px' }}>
           <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Win Rate</div>
           <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '0.35rem', color: '#facc15' }}>
-            {metrics?.win_rate_pct !== undefined ? `${metrics.win_rate_pct}%` : '—'}
+            {fmtMetric(metrics?.win_rate_pct, { suffix: '%' })}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-            Winning trades percentage
+            {totalTrades > 0 ? `${totalTrades} trades` : 'Winning trades percentage'}
           </div>
         </div>
 
         <div className="stat-card" style={{ background: 'rgba(15, 23, 42, 0.55)', padding: '1.25rem', borderRadius: '14px' }}>
           <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Benchmark Alpha</div>
           <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '0.35rem', color: (metrics?.alpha_pct ?? 0) >= 0 ? '#10b981' : '#ef4444' }}>
-            {metrics?.alpha_pct !== undefined ? `${metrics.alpha_pct > 0 ? '+' : ''}${metrics.alpha_pct}%` : '—'}
+            {fmtMetric(metrics?.alpha_pct, { suffix: '%', signed: true })}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-            Outperformance vs IHSG
+            {metrics?.alpha_pct == null
+              ? 'Unavailable (no benchmark series)'
+              : 'vs provided benchmark'}
           </div>
         </div>
       </div>
@@ -462,18 +494,38 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
           <div>
             <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700 }}>Portfolio Equity Curve (Base 100)</h3>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              Compounded portfolio growth over time
+              Equal-weight basket return by exit session
+              {metrics?.holding_days != null ? ` · holding ${metrics.holding_days} sessions` : ''}
             </span>
           </div>
         </div>
 
-        <div
-          ref={chartContainerRef}
-          style={{ width: '100%', height: '360px', position: 'relative', borderRadius: '8px', overflow: 'hidden' }}
-        />
+        {result && (!result.equity_curve || result.equity_curve.length === 0) ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+            No equity curve — zero trades in this run.
+          </div>
+        ) : (
+          <div
+            ref={chartContainerRef}
+            style={{ width: '100%', height: '360px', position: 'relative', borderRadius: '8px', overflow: 'hidden' }}
+          />
+        )}
       </div>
 
       {/* Simulated Trades Table */}
+      {result && totalTrades === 0 && (
+        <div style={{
+          background: 'rgba(15, 23, 42, 0.55)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '16px',
+          padding: '1.5rem',
+          color: 'var(--text-secondary)',
+          fontSize: '0.9rem',
+        }}>
+          No simulated trades for this parameter set.
+        </div>
+      )}
+
       {result && result.trades && result.trades.length > 0 && (
         <div style={{
           background: 'rgba(15, 23, 42, 0.55)',
@@ -485,7 +537,8 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div>
               <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700 }}>
-                Simulated Trades Log ({result.trades.length})
+                Simulated Trades Log ({totalTrades}
+                {tradesShown < totalTrades ? ` · showing ${tradesShown} recent` : ''})
               </h3>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                 Showing up to 50 recent executions
@@ -539,8 +592,8 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
                     <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700, color: '#38bdf8' }}>{t.StockCode}</td>
                     <td style={{ padding: '0.75rem 0.5rem', color: 'var(--text-secondary)' }}>{t.EntryDate}</td>
                     <td style={{ padding: '0.75rem 0.5rem', color: 'var(--text-secondary)' }}>{t.ExitDate}</td>
-                    <td style={{ padding: '0.75rem 0.5rem' }}>Rp {t.EntryPrice.toLocaleString()}</td>
-                    <td style={{ padding: '0.75rem 0.5rem' }}>Rp {t.ExitPrice.toLocaleString()}</td>
+                    <td style={{ padding: '0.75rem 0.5rem' }}>Rp {Number(t.EntryPrice).toLocaleString()}</td>
+                    <td style={{ padding: '0.75rem 0.5rem' }}>Rp {Number(t.ExitPrice).toLocaleString()}</td>
                     <td style={{ padding: '0.75rem 0.5rem', color: 'var(--text-secondary)' }}>
                       {t.Weight !== undefined ? `${(t.Weight * 100).toFixed(1)}%` : '—'}
                     </td>

@@ -1,0 +1,62 @@
+"""CORS configuration — permissive in development, explicit in production."""
+
+from __future__ import annotations
+
+import os
+from typing import Any
+
+
+def resolve_cors_origins(
+    *,
+    env: str | None = None,
+    origins_env: str | None = None,
+) -> dict[str, Any]:
+    """Return CORS settings.
+
+    development (default): allow_origins=['*'] for local SPA; credentials OFF
+    (browsers reject Access-Control-Allow-Origin: * with credentials).
+    production: require RITELINSIGHT_CORS_ORIGINS comma-list; never wildcard with credentials.
+    """
+    mode = (env or os.environ.get("RITELINSIGHT_ENV") or "development").strip().lower()
+    raw = origins_env if origins_env is not None else os.environ.get("RITELINSIGHT_CORS_ORIGINS")
+    if mode in ("prod", "production"):
+        origins = [o.strip() for o in (raw or "").split(",") if o.strip()]
+        if not origins:
+            return {
+                "mode": "production",
+                "allow_origins": [],
+                "allow_credentials": True,
+                "warning": (
+                    "RITELINSIGHT_CORS_ORIGINS is empty in production — "
+                    "set explicit origins (no wildcard)."
+                ),
+            }
+        if "*" in origins:
+            return {
+                "mode": "production",
+                "allow_origins": [o for o in origins if o != "*"],
+                "allow_credentials": True,
+                "warning": "Wildcard '*' stripped in production CORS.",
+            }
+        return {
+            "mode": "production",
+            "allow_origins": origins,
+            "allow_credentials": True,
+            "warning": None,
+        }
+    # Development: if operator set explicit origins, allow credentials with those.
+    if raw and raw.strip() and raw.strip() != "*":
+        origins = [o.strip() for o in raw.split(",") if o.strip() and o.strip() != "*"]
+        return {
+            "mode": "development",
+            "allow_origins": origins or ["*"],
+            "allow_credentials": bool(origins),
+            "warning": None,
+        }
+    return {
+        "mode": "development",
+        "allow_origins": ["*"],
+        "allow_credentials": False,
+        "warning": None,
+    }
+

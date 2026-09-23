@@ -2,6 +2,29 @@
 Vectorized Backtesting & Strategy Simulation Framework for IDX Quantitative Signals.
 
 Evaluates forward performance, holding returns, Sharpe ratios, drawdowns, and benchmark alpha.
+
+Point-in-time (PIT) / entry-date contract
+----------------------------------------
+For a decision made on ``entry_date``, every feature used for that decision must
+use only information available on or before ``entry_date``:
+
+* OHLCV / foreign flow / technicals: ``history_slice = stock[Date <= entry_date]``
+* Fundamental ratios (sharia_value, composite_alpha): ``as_of=entry_date``
+  (``fsDate <= entry_date``; undated filings excluded)
+* Never fall back to a live dashboard snapshot or post-entry bars for ranking
+
+Entry / exit semantics (``run_backtest``, non-dividend strategies)
+-----------------------------------------------------------------
+* Signal evaluation: on ``entry_date`` using the PIT slice / ``as_of`` above
+* Entry: same-session Close on ``entry_date`` (requires a trading bar that day)
+* Exit (default): Close on the session ``holding_days`` calendar-unique dates later
+  in the backtest date index (not calendar days); if that bar is missing for the
+  ticker, last available Close on or before the planned exit within the window
+* Optional stop-loss / take-profit: after entry, checked on subsequent session
+  Closes; fill approximated at the stop/target return level (not the raw Close);
+  ``ExitDate`` is the session where the stop/target first triggers
+* Fees / slippage / position sizing: not implemented
+* Price basis: raw IDX ``Close`` from stock_summary (not corporate-action adjusted)
 """
 
 import os
@@ -9,7 +32,7 @@ import os
 import numpy as np
 import pandas as pd
 
-from idx.core.currency import get_usd_idr_rate
+from idx.core.currency import resolve_usd_idr_quote
 from idx.core.utils import DATA_DIR, get_logger, load_json
 from idx.signals import (
     composite_alpha_ranking,
@@ -22,9 +45,47 @@ log = get_logger("idx.backtest")
 PARQUET_DIR = os.path.join(DATA_DIR, "parquet")
 DETAILS_FILE = os.path.join(DATA_DIR, "companyDetailsByKodeEmiten.json")
 
+SUPPORTED_STRATEGIES = frozenset(
+    {
+        "foreign_flow",
+        "bandarmology",
+        "sharia_value",
+        "composite_alpha",
+        "dividend_arbitrage",
+    }
+)
+
+_EMPTY_METRICS = {
+    "total_return_pct": 0.0,
+    # True CAGR is unavailable without an unambiguous calendar span; never mirror total return.
+    "cagr_pct": None,
+    "sharpe_ratio": 0.0,
+    "sortino_ratio": 0.0,
+    "max_drawdown_pct": 0.0,
+    "win_rate_pct": 0.0,
+    "profit_factor": 0.0,
+    "total_trades": 0,
+    "avg_trade_return_pct": 0.0,
+    "benchmark_return_pct": None,
+    "alpha_pct": None,
+}
+
+
+def _empty_result(strategy: str, holding_days: int) -> tuple[dict, pd.DataFrame]:
+    """API-safe empty backtest result (no fabricated trades or equity dates)."""
+    metrics = dict(_EMPTY_METRICS)
+    metrics["strategy"] = strategy
+    metrics["holding_days"] = holding_days
+    return metrics, pd.DataFrame()
+
 
 def _load_data():
-    """Loads Parquet datasets required for simulation."""
+    """Loads Parquet datasets required for simulation.
+
+    Historical strategy runs that inject ``stock_df`` / ``ratios_df`` never call this.
+    Default path loads partitioned Parquet under ``DATA_DIR/parquet`` only — never
+    ``network_alpha_data.json`` or other dashboard snapshots.
+    """
     stock_path = os.path.join(PARQUET_DIR, "stock_summary.parquet")
     ratios_path = os.path.join(PARQUET_DIR, "financial_ratios.parquet")
     actions_path = os.path.join(PARQUET_DIR, "corporate_actions.parquet")
@@ -37,29 +98,43 @@ def _load_data():
     return stock, ratios, actions, broker
 
 
+def _pit_market_slice(df: pd.DataFrame, entry_date) -> pd.DataFrame:
+    """Market rows available on or before ``entry_date`` (inclusive)."""
+    return df[df["Date"] <= entry_date]
+
+
+def _portfolio_period_returns(trades_df: pd.DataFrame) -> pd.Series:
+    """Equal-weight mean return per ExitDate (one portfolio step per exit session).
+
+    Matches the API equity-curve compounding: parallel Top-N basket legs that share
+    an exit session are averaged, not chained as sequential leverage.
+    """
+    if trades_df is None or len(trades_df) == 0 or "Return" not in trades_df.columns:
+        return pd.Series(dtype=float)
+    ordered = trades_df.sort_values("ExitDate") if "ExitDate" in trades_df.columns else trades_df
+    if "ExitDate" in ordered.columns:
+        return ordered.groupby("ExitDate", sort=True)["Return"].mean()
+    return ordered["Return"].astype(float)
+
+
 def calculate_metrics(
     returns: pd.Series, benchmark_returns: pd.Series = None, risk_free_rate: float = 0.055
 ) -> dict:
-    """Calculates standardized quantitative performance statistics."""
-    if len(returns) == 0:
-        return {
-            "total_return_pct": 0.0,
-            "cagr_pct": 0.0,
-            "sharpe_ratio": 0.0,
-            "sortino_ratio": 0.0,
-            "max_drawdown_pct": 0.0,
-            "win_rate_pct": 0.0,
-            "profit_factor": 0.0,
-            "total_trades": 0,
-            "avg_trade_return_pct": 0.0,
-            "benchmark_return_pct": 0.0,
-            "alpha_pct": 0.0,
-        }
+    """Calculates standardized quantitative performance statistics.
 
-    clean_returns = returns.dropna()
+    ``cagr_pct`` is always ``None`` (unavailable): the engine does not have an
+    unambiguous calendar span for true CAGR, and must not mirror ``total_return_pct``.
+
+    ``benchmark_return_pct`` / ``alpha_pct`` are ``None`` unless a non-empty
+    ``benchmark_returns`` series is provided.
+    """
+    if len(returns) == 0:
+        return dict(_EMPTY_METRICS)
+
+    clean_returns = returns.replace([np.inf, -np.inf], np.nan).dropna()
     total_trades = len(clean_returns)
     if total_trades == 0:
-        return {"total_trades": 0}
+        return dict(_EMPTY_METRICS)
 
     pos_returns = clean_returns[clean_returns > 0]
     neg_returns = clean_returns[clean_returns < 0]
@@ -80,7 +155,7 @@ def calculate_metrics(
     drawdowns = (equity_curve - running_max) / (running_max + 1e-9)
     max_drawdown = abs(drawdowns.min()) * 100.0 if len(drawdowns) > 0 else 0.0
 
-    # Annualization factor (assume 252 sessions/year)
+    # Annualization factor (assume 252 sessions/year) — applied to the return series as given
     mean_ret = clean_returns.mean()
     std_ret = clean_returns.std()
     downside_std = clean_returns[clean_returns < 0].std()
@@ -91,19 +166,19 @@ def calculate_metrics(
         ((mean_ret - daily_rf) / (downside_std + 1e-9)) * np.sqrt(252) if downside_std > 0 else 0.0
     )
 
-    # Benchmark & Alpha
-    bench_ret_pct = 0.0
+    # Benchmark & Alpha — unavailable unless a benchmark series is supplied
+    bench_ret_pct = None
+    alpha = None
     if benchmark_returns is not None and len(benchmark_returns) > 0:
-        bench_clean = benchmark_returns.dropna()
+        bench_clean = benchmark_returns.replace([np.inf, -np.inf], np.nan).dropna()
         if len(bench_clean) > 0:
             bench_equity = (1.0 + bench_clean).cumprod()
-            bench_ret_pct = (bench_equity.iloc[-1] - 1.0) * 100.0
-
-    alpha = total_return - bench_ret_pct
+            bench_ret_pct = round((bench_equity.iloc[-1] - 1.0) * 100.0, 2)
+            alpha = round(total_return - bench_ret_pct, 2)
 
     return {
         "total_return_pct": round(total_return, 2),
-        "cagr_pct": round(total_return, 2),
+        "cagr_pct": None,
         "sharpe_ratio": round(sharpe, 2),
         "sortino_ratio": round(sortino, 2),
         "max_drawdown_pct": round(max_drawdown, 2),
@@ -111,8 +186,8 @@ def calculate_metrics(
         "profit_factor": round(profit_factor, 2),
         "total_trades": total_trades,
         "avg_trade_return_pct": round(clean_returns.mean() * 100.0, 2),
-        "benchmark_return_pct": round(bench_ret_pct, 2),
-        "alpha_pct": round(alpha, 2),
+        "benchmark_return_pct": bench_ret_pct,
+        "alpha_pct": alpha,
     }
 
 
@@ -145,12 +220,28 @@ def simulate_dividend_arbitrage(
         stock_df, _, actions_df, *_ = _load_data()
     if details_dict is None:
         details_dict = load_json(DETAILS_FILE) if os.path.exists(DETAILS_FILE) else {}
+    fx_quote: dict | None = None
     if usd_rate is None or usd_rate <= 0:
-        usd_rate = get_usd_idr_rate()
+        fx_quote = resolve_usd_idr_quote()
+        usd_rate = float(fx_quote["rate"] if fx_quote.get("rate") is not None else 16200.0)
+    else:
+        fx_quote = {
+            "rate": float(usd_rate),
+            "status": "caller_supplied",
+            "source": "caller_supplied",
+            "origin": "caller_supplied",
+            "quality": "U",
+            "confidence": None,
+            "is_live": False,
+            "is_market_quote": False,
+            "is_default_constant": False,
+            "is_verified_fx": False,
+            "notes": "Caller-supplied USD/IDR — not validated as a live market quote.",
+        }
 
     if len(stock_df) == 0 or not details_dict:
         log.warning("Insufficient data for dividend arbitrage simulation.")
-        return {}, pd.DataFrame()
+        return _empty_result("dividend_arbitrage", post_ex_holding_days)
 
     df = stock_df.copy()
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
@@ -201,7 +292,7 @@ def simulate_dividend_arbitrage(
 
     if not events:
         log.warning("No dividend events found for simulation.")
-        return {}, pd.DataFrame()
+        return _empty_result("dividend_arbitrage", post_ex_holding_days)
 
     trades_a = []
     trades_b = []
@@ -335,6 +426,8 @@ def simulate_dividend_arbitrage(
         "win_rate_pct": metrics_b["win_rate_pct"],
         "max_drawdown_pct": metrics_b["max_drawdown_pct"],
         "total_trades": len(combined_trades),
+        "usd_idr": fx_quote,
+        "fx": fx_quote,
     }
 
     return metrics, combined_trades
@@ -359,8 +452,8 @@ def run_backtest(
 
     Args:
         strategy: "foreign_flow" | "bandarmology" | "stealth_accumulation" | "sharia_value" | "composite_alpha" | "dividend_arbitrage"
-        holding_days: forward holding period in trading sessions
-        top_n: number of stocks picked per rebalancing session
+        holding_days: forward holding period in trading sessions (must be >= 1)
+        top_n: number of stocks picked per rebalancing session (must be >= 1)
         min_turnover_rp: minimum average daily turnover filter
         start_date: optional starting date filter (YYYY-MM-DD)
         end_date: optional ending date filter (YYYY-MM-DD)
@@ -369,9 +462,45 @@ def run_backtest(
         position_sizing: "equal_weight" | "volatility_parity"
         stock_df, ratios_df, actions_df, broker_df: optional custom DataFrames
 
+    Strategy / engine separation
+    ----------------------------
+    * Strategy (signal screens in ``idx.signals``): decide WHAT to trade on each
+      ``entry_date`` from PIT features only.
+    * This engine: decide HOW fills, holding, SL/TP, and trade ledger are applied.
+    * Metrics layer (``calculate_metrics``): summarize portfolio/trade results.
+
+    Historical isolation
+    --------------------
+    When ``stock_df`` / ``ratios_df`` are supplied, this function does not read
+    dashboard snapshots (``network_alpha_data.json``), live FX, or company-detail
+    JSON. Default data load uses Parquet only.
+
     Returns:
         tuple (metrics_dict, trades_dataframe)
     """
+    if strategy not in SUPPORTED_STRATEGIES:
+        log.warning("Unsupported strategy %r — returning empty result.", strategy)
+        return _empty_result(str(strategy), holding_days if isinstance(holding_days, int) else 0)
+
+    if not isinstance(holding_days, (int, np.integer)) or holding_days < 1:
+        log.warning("Invalid holding_days=%r — returning empty result.", holding_days)
+        return _empty_result(strategy, 0)
+
+    if not isinstance(top_n, (int, np.integer)) or top_n < 1:
+        log.warning("Invalid top_n=%r — returning empty result.", top_n)
+        return _empty_result(strategy, int(holding_days))
+
+    if start_date and end_date:
+        start_ts = pd.to_datetime(start_date, errors="coerce")
+        end_ts = pd.to_datetime(end_date, errors="coerce")
+        if pd.isna(start_ts) or pd.isna(end_ts) or start_ts > end_ts:
+            log.warning(
+                "Invalid date range start=%r end=%r — returning empty result.",
+                start_date,
+                end_date,
+            )
+            return _empty_result(strategy, int(holding_days))
+
     if strategy == "dividend_arbitrage":
         return simulate_dividend_arbitrage(
             stock_df=stock_df,
@@ -386,7 +515,7 @@ def run_backtest(
 
     if len(stock_df) == 0:
         log.warning("No stock summary data for backtest.")
-        return {}, pd.DataFrame()
+        return _empty_result(strategy, int(holding_days))
 
     df = stock_df.copy()
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
@@ -400,7 +529,7 @@ def run_backtest(
         log.warning(
             "Insufficient dates (%d) for holding period (%d)", len(unique_dates), holding_days
         )
-        return {}, pd.DataFrame()
+        return _empty_result(strategy, int(holding_days))
 
     log.info(
         "Starting backtest: strategy=%s, holding=%d, sessions=%d, dates=[%s → %s]",
@@ -415,22 +544,34 @@ def run_backtest(
     # Rebalance every `holding_days` sessions
     for i in range(0, len(unique_dates) - holding_days, holding_days):
         entry_date = unique_dates[i]
-        exit_date = unique_dates[i + holding_days]
+        planned_exit_date = unique_dates[i + holding_days]
 
-        # Slices up to entry_date
-        history_slice = df[df["Date"] <= entry_date]
+        # PIT market features: never include bars after entry_date
+        history_slice = _pit_market_slice(df, entry_date)
+        if history_slice.empty:
+            continue
 
-        # Generate candidates based on strategy
+        # Generate candidates based on strategy (PIT features only)
         selected_tickers: list[str] = []
         if strategy == "foreign_flow":
             radar = foreign_flow_radar(
                 history_slice, window_days=min(10, i + 1), min_turnover_rp=min_turnover_rp
             )
-            selected_tickers = radar.head(top_n)["StockCode"].tolist() if len(radar) > 0 else []
+            if len(radar) > 0:
+                radar = radar.sort_values(
+                    ["PctFloat", "StockCode"], ascending=[False, True], kind="mergesort"
+                )
+                selected_tickers = radar.head(top_n)["StockCode"].tolist()
 
         elif strategy == "sharia_value":
-            sharia = sharia_value_screen(ratios_df)
-            selected_tickers = sharia.head(top_n)["code"].tolist() if len(sharia) > 0 else []
+            # Fundamentals strictly as_of entry_date — no latest-snapshot fallback
+            sharia = sharia_value_screen(ratios_df, as_of=entry_date)
+            if len(sharia) > 0:
+                # Deterministic tie-break on code (screen ranks by ROE desc).
+                sort_cols = [c for c in ("roe", "code") if c in sharia.columns]
+                ascending = [False if c == "roe" else True for c in sort_cols]
+                sharia = sharia.sort_values(sort_cols, ascending=ascending, kind="mergesort")
+                selected_tickers = sharia.head(top_n)["code"].tolist()
 
         elif strategy == "composite_alpha":
             alpha = composite_alpha_ranking(
@@ -439,8 +580,13 @@ def run_backtest(
                 actions=actions_df,
                 min_turnover_rp=min_turnover_rp,
                 top_n=top_n,
+                as_of=entry_date,
             )
-            selected_tickers = alpha.head(top_n)["StockCode"].tolist() if len(alpha) > 0 else []
+            if len(alpha) > 0:
+                alpha = alpha.sort_values(
+                    ["AlphaScore", "StockCode"], ascending=[False, True], kind="mergesort"
+                )
+                selected_tickers = alpha.head(top_n)["StockCode"].tolist()
 
         elif strategy in ("bandarmology", "stealth_accumulation"):
             from idx.signals import detect_stealth_accumulation
@@ -474,7 +620,11 @@ def run_backtest(
                         latest_tech["TrendRegime"].isin(["STRONG_BULLISH", "BULLISH"])
                     ]
                     selected_tickers = (
-                        bullish.sort_values("VolRatio20", ascending=False)
+                        bullish.sort_values(
+                            ["VolRatio20", "StockCode"],
+                            ascending=[False, True],
+                            kind="mergesort",
+                        )
                         .head(top_n)["StockCode"]
                         .tolist()
                     )
@@ -500,46 +650,60 @@ def run_backtest(
             w_eq = 1.0 / len(selected_tickers) if selected_tickers else 0.0
             weights = {t: w_eq for t in selected_tickers}
 
-        # Evaluate performance for each selected ticker between entry_date and exit_date
-        period_weighted_ret = 0.0
-        active_weights = 0.0
-
+        # Evaluate performance for each selected ticker between entry_date and exit
         for ticker in selected_tickers:
             ticker_slice = df[
-                (df["StockCode"] == ticker) & (df["Date"] >= entry_date) & (df["Date"] <= exit_date)
+                (df["StockCode"] == ticker)
+                & (df["Date"] >= entry_date)
+                & (df["Date"] <= planned_exit_date)
             ].sort_values("Date")
-            if len(ticker_slice) < 2:
+            if ticker_slice.empty:
                 continue
 
-            entry_price = float(ticker_slice.iloc[0]["Close"])
+            # Same-session Close entry — require an actual bar on entry_date
+            entry_rows = ticker_slice[ticker_slice["Date"] == entry_date]
+            if entry_rows.empty:
+                continue
+            entry_price = float(entry_rows.iloc[0]["Close"])
             if entry_price <= 0:
                 continue
 
-            exit_price = float(ticker_slice.iloc[-1]["Close"])
+            actual_exit_date = planned_exit_date
+            exit_rows = ticker_slice[ticker_slice["Date"] == planned_exit_date]
+            if not exit_rows.empty:
+                exit_price = float(exit_rows.iloc[0]["Close"])
+            else:
+                # Missing planned exit session: last available Close on/before planned exit
+                post_entry = ticker_slice[ticker_slice["Date"] > entry_date]
+                if post_entry.empty:
+                    continue
+                actual_exit_date = post_entry.iloc[-1]["Date"]
+                exit_price = float(post_entry.iloc[-1]["Close"])
+
             ret = (exit_price - entry_price) / entry_price
 
-            # Apply Stop Loss / Take Profit if specified
+            # Apply Stop Loss / Take Profit if specified (session Close check)
             if stop_loss_pct or take_profit_pct:
-                for _, session_row in ticker_slice.iloc[1:].iterrows():
+                for _, session_row in ticker_slice[ticker_slice["Date"] > entry_date].iterrows():
                     curr_c = float(session_row["Close"])
                     curr_ret = (curr_c - entry_price) / entry_price
                     if stop_loss_pct and curr_ret <= -(stop_loss_pct / 100.0):
                         ret = -(stop_loss_pct / 100.0)
                         exit_price = entry_price * (1.0 + ret)
+                        actual_exit_date = session_row["Date"]
                         break
                     if take_profit_pct and curr_ret >= (take_profit_pct / 100.0):
                         ret = take_profit_pct / 100.0
                         exit_price = entry_price * (1.0 + ret)
+                        actual_exit_date = session_row["Date"]
                         break
 
             w = weights.get(ticker, 1.0 / len(selected_tickers))
-            period_weighted_ret += ret * w
-            active_weights += w
-
+            exit_dt = pd.Timestamp(actual_exit_date)
             trades.append(
                 {
-                    "EntryDate": entry_date.strftime("%Y-%m-%d"),
-                    "ExitDate": exit_date.strftime("%Y-%m-%d"),
+                    "EntryDate": pd.Timestamp(entry_date).strftime("%Y-%m-%d"),
+                    "ExitDate": exit_dt.strftime("%Y-%m-%d"),
                     "StockCode": ticker,
                     "EntryPrice": entry_price,
                     "ExitPrice": exit_price,
@@ -551,8 +715,21 @@ def run_backtest(
             )
 
     trades_df = pd.DataFrame(trades)
-    returns_series = trades_df["Return"] if len(trades_df) > 0 else pd.Series(dtype=float)
-    metrics = calculate_metrics(returns_series)
+    if len(trades_df) > 0:
+        # Portfolio path (equal-weight by ExitDate) drives total return / risk / drawdown.
+        # Trade path drives win rate, avg trade, profit factor, and trade count.
+        period_returns = _portfolio_period_returns(trades_df)
+        port_metrics = calculate_metrics(period_returns)
+        trade_metrics = calculate_metrics(trades_df["Return"])
+        metrics = {
+            **port_metrics,
+            "total_trades": int(len(trades_df)),
+            "win_rate_pct": trade_metrics["win_rate_pct"],
+            "avg_trade_return_pct": trade_metrics["avg_trade_return_pct"],
+            "profit_factor": trade_metrics["profit_factor"],
+        }
+    else:
+        metrics = calculate_metrics(pd.Series(dtype=float))
     metrics["strategy"] = strategy
     metrics["holding_days"] = holding_days
     metrics["position_sizing"] = position_sizing

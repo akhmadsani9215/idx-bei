@@ -1,0 +1,170 @@
+"""Auth boundary for private resources (watchlist / journal / plans).
+
+Production IdP is NOT_CONFIGURED. Opaque local sessions provide an authorization
+boundary so User A cannot read User B data. Frontend must NEVER send user_id
+as a trusted identity — only the session token.
+"""
+
+from __future__ import annotations
+
+import os
+import secrets
+import threading
+import time
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Any
+
+AUTH_STATUS = "NOT_CONFIGURED"  # no external IdP / OAuth
+ENGINE_VERSION = "auth-1.1"
+
+# Default 12h idle/absolute TTL for local opaque sessions (seconds).
+_DEFAULT_TTL_SECONDS = 12 * 60 * 60
+
+_LOCK = threading.Lock()
+_SESSIONS: dict[str, dict[str, Any]] = {}
+
+
+@dataclass(frozen=True)
+class SessionPrincipal:
+    session_id: str
+    subject: str  # opaque local subject, not a trusted client-supplied user_id
+
+
+def _ttl_seconds() -> int:
+    raw = os.environ.get("RITELINSIGHT_SESSION_TTL_SECONDS")
+    if raw is None or not str(raw).strip():
+        return _DEFAULT_TTL_SECONDS
+    try:
+        val = int(raw)
+        return val if val > 0 else _DEFAULT_TTL_SECONDS
+    except ValueError:
+        return _DEFAULT_TTL_SECONDS
+
+
+def auth_status() -> dict[str, Any]:
+    return {
+        "status": AUTH_STATUS,
+        "mode": "local_opaque_session",
+        "multi_user_identity_provider": "MULTI-USER IDENTITY PROVIDER NOT CONFIGURED",
+        "session_ttl_seconds": _ttl_seconds(),
+        "cookie_flags": {
+            "note": (
+                "API uses Authorization Bearer / X-Ritel-Session headers — "
+                "not browser cookies. If cookies are introduced later: "
+                "HttpOnly + Secure + SameSite=Lax|Strict required."
+            ),
+            "HttpOnly": "N/A_HEADER_TOKEN",
+            "Secure": "N/A_HEADER_TOKEN",
+            "SameSite": "N/A_HEADER_TOKEN",
+        },
+        "notes": (
+            "External authentication is NOT_CONFIGURED. "
+            "Private resources use opaque server-issued session tokens. "
+            "Clients must not supply user_id as identity. "
+            "MULTI-USER IDENTITY PROVIDER NOT CONFIGURED — sessions are local/opaque only."
+        ),
+        "engine_version": ENGINE_VERSION,
+        "calculated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def create_session(*, label: str | None = None) -> dict[str, Any]:
+    """Issue a new opaque session. subject is server-generated.
+
+    Session fixation: token is always server-minted; never accept client session_id.
+    """
+    session_id = secrets.token_urlsafe(32)
+    subject = f"local_{secrets.token_hex(8)}"
+    now = time.time()
+    rec = {
+        "session_id": session_id,
+        "subject": subject,
+        "label": (label or "").strip()[:64] or None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_ts": now,
+        "last_seen": now,
+    }
+    with _LOCK:
+        _purge_expired_unlocked(now)
+        _SESSIONS[session_id] = rec
+    return {
+        "session_id": session_id,
+        "auth": auth_status(),
+        "expires_in_seconds": _ttl_seconds(),
+        "subject_hint": subject[:12] + "…",  # never expose full for logging UIs
+    }
+
+
+def _purge_expired_unlocked(now: float | None = None) -> None:
+    ts = now if now is not None else time.time()
+    ttl = _ttl_seconds()
+    expired = [
+        sid
+        for sid, rec in _SESSIONS.items()
+        if (ts - float(rec.get("last_seen") or rec.get("created_ts") or 0)) > ttl
+    ]
+    for sid in expired:
+        _SESSIONS.pop(sid, None)
+
+
+def resolve_session(session_id: str | None) -> SessionPrincipal | None:
+    if not session_id or not isinstance(session_id, str):
+        return None
+    token = session_id.strip()
+    if not token:
+        return None
+    with _LOCK:
+        _purge_expired_unlocked()
+        rec = _SESSIONS.get(token)
+        if not rec:
+            return None
+        now = time.time()
+        ttl = _ttl_seconds()
+        age = now - float(rec.get("last_seen") or rec.get("created_ts") or 0)
+        if age > ttl:
+            _SESSIONS.pop(token, None)
+            return None
+        rec["last_seen"] = now
+        return SessionPrincipal(session_id=token, subject=str(rec["subject"]))
+
+
+def require_session(session_id: str | None) -> SessionPrincipal:
+    principal = resolve_session(session_id)
+    if principal is None:
+        raise PermissionError("UNAUTHORIZED: valid session required")
+    return principal
+
+
+def invalidate_session(session_id: str | None) -> bool:
+    """Logout: drop server-side session so the token cannot be reused."""
+    if not session_id or not isinstance(session_id, str):
+        return False
+    token = session_id.strip()
+    if not token:
+        return False
+    with _LOCK:
+        return _SESSIONS.pop(token, None) is not None
+
+
+def strip_client_identity_fields(payload: dict[str, Any] | None) -> dict[str, Any]:
+    """Remove client-supplied identity fields that must never be trusted."""
+    if not isinstance(payload, dict):
+        return {}
+    blocked = {
+        "user_id",
+        "userid",
+        "userId",
+        "subject",
+        "session_id",
+        "sessionId",
+        "owner_id",
+        "ownerId",
+    }
+    return {k: v for k, v in payload.items() if k not in blocked}
+
+
+def clear_sessions_for_tests() -> None:
+    with _LOCK:
+        _SESSIONS.clear()
+

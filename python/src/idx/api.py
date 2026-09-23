@@ -4,13 +4,14 @@ High-Performance FastAPI REST & WebSocket Microservice Layer for IDX-BEI Toolkit
 
 import asyncio
 import json
+import math
 import os
 import time
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -29,7 +30,16 @@ from idx.ingestion import (
     list_recent_jobs,
     run_async_ingestion_job,
 )
-from idx.signals import broker_concentration_screen, build_briefing, compute_technical_indicators
+from idx.signals import (
+    broker_concentration_screen,
+    build_briefing,
+    compute_technical_indicators,
+)
+from idx.screener import run_screener
+from idx.api_extra import register_extra_routes
+from idx.cors_config import resolve_cors_origins
+from idx.public_static import resolve_public_data_path
+from idx.ticker_safe import sanitize_ticker
 
 app = FastAPI(
     title="IDX-BEI Quantitative & Microservice API",
@@ -37,33 +47,76 @@ app = FastAPI(
     version="0.2.0",
 )
 
+_CORS = resolve_cors_origins()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_CORS["allow_origins"] or ["http://127.0.0.1"],
+    allow_credentials=_CORS["allow_credentials"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Extra production routes (watchlist, terminal aliases, strategy lab, providers).
+register_extra_routes(app)
 
 REPO_ROOT = os.path.abspath(os.path.join(DATA_DIR, ".."))
 DASHBOARD_DIR = os.path.join(REPO_ROOT, "dashboard")
 FRONTEND_DIST = os.path.join(REPO_ROOT, "frontend", "dist")
 
 SERVE_DIR = FRONTEND_DIST if os.path.exists(FRONTEND_DIST) else DASHBOARD_DIR
-if os.path.exists(SERVE_DIR):
-    app.mount("/dashboard", StaticFiles(directory=SERVE_DIR, html=True), name="dashboard")
 
-if os.path.exists(DATA_DIR):
-    app.mount("/data", StaticFiles(directory=DATA_DIR), name="data")
+if os.path.exists(SERVE_DIR):
+    app.mount(
+        "/dashboard",
+        StaticFiles(directory=SERVE_DIR, html=True),
+        name="dashboard",
+    )
+
+# DO NOT mount entire DATA_DIR — private watchlist/journal stores and ownership CSVs
+# must not be world-readable. Public artifacts are served via allowlisted /data/{file}.
 
 FRONTEND_ASSETS = os.path.join(FRONTEND_DIST, "assets")
+
 if os.path.exists(FRONTEND_ASSETS):
-    app.mount("/assets", StaticFiles(directory=FRONTEND_ASSETS), name="assets")
+    app.mount(
+        "/assets",
+        StaticFiles(directory=FRONTEND_ASSETS),
+        name="assets",
+    )
+
+
+def _is_production_env() -> bool:
+    return (os.environ.get("RITELINSIGHT_ENV") or "").strip().lower() in (
+        "prod",
+        "production",
+    )
+
+
+def safe_http_detail(exc: BaseException, *, public: str = "Internal server error") -> str:
+    """Avoid leaking tracebacks / internals in production responses."""
+    if _is_production_env():
+        return public
+    return str(exc) or public
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Sanitize unexpected errors — never return traceback bodies to clients.
+
+    HTTPException / validation errors use FastAPI's more-specific handlers.
+    """
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "INTERNAL_ERROR",
+            "detail": safe_http_detail(exc),
+            "path": str(request.url.path),
+        },
+    )
 
 
 @app.get("/", include_in_schema=False)
 async def root_redirect():
-    """Redirect root path directly to the visual dashboard."""
     return RedirectResponse(url="/dashboard/")
 
 
@@ -81,6 +134,15 @@ def get_from_cache(key: str, ttl_seconds: float = 60.0) -> Any | None:
 
 def set_in_cache(key: str, value: Any) -> None:
     _TTL_CACHE[key] = (time.time(), value)
+
+
+@app.get("/data/{filename}", tags=["System"])
+async def public_data_file(filename: str):
+    """Serve allowlisted public data files only (no private stores / CSVs)."""
+    path = resolve_public_data_path(filename)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    return FileResponse(path)
 
 
 class SQLQueryRequest(BaseModel):
@@ -102,40 +164,152 @@ class BacktestRequest(BaseModel):
 
 
 class TriggerIngestionRequest(BaseModel):
-    job_type: str = "daily"  # "daily" or "backfill"
-    date: str | None = None  # YYYYMMDD for daily
-    start_date: str | None = None  # YYYYMMDD for backfill
-    end_date: str | None = None  # YYYYMMDD for backfill
+    job_type: str = "daily"
+    date: str | None = None
+    start_date: str | None = None
+    end_date: str | None = None
     concurrency: int = 8
+    path_or_url: str | None = None
+
+
+# Allowed job types for Data Center triggers (no fabricated pipelines).
+_ALLOWED_INGESTION_JOB_TYPES = frozenset({"daily", "backfill", "sync_all", "ownership"})
+
+
+def json_safe(value):
+    """Recursively convert pandas/NumPy values to strict JSON-safe values."""
+
+    if value is None:
+        return None
+
+    # Preserve mappings and recursively sanitize their values.
+    if isinstance(value, dict):
+        return {
+            str(key): json_safe(item)
+            for key, item in value.items()
+        }
+
+    # Recursively sanitize sequences while preserving list output.
+    if isinstance(value, (list, tuple, set)):
+        return [json_safe(item) for item in value]
+
+    # Convert NumPy scalar values to native Python values.
+    if hasattr(value, "item"):
+        try:
+            value = value.item()
+        except (ValueError, TypeError):
+            pass
+
+    if value is None:
+        return None
+
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+
+    try:
+        import pandas as pd
+
+        if isinstance(value, pd.Timestamp):
+            if pd.isna(value):
+                return None
+            return value.isoformat()
+
+        # Only evaluate scalar missingness here.
+        missing = pd.isna(value)
+        if isinstance(missing, bool):
+            if missing:
+                return None
+
+    except (TypeError, ValueError):
+        pass
+
+    return value
+
+
+def dataframe_to_json_records(df):
+    """Convert every DataFrame value to strict JSON-safe Python values."""
+
+    records = []
+
+    for row in df.to_dict(orient="records"):
+        records.append(
+            {
+                key: json_safe(value)
+                for key, value in row.items()
+            }
+        )
+
+    return records
 
 
 @app.get("/health", tags=["System"])
 async def health():
-    return {"status": "ok", "service": "idx-bei-api", "version": "0.2.0"}
+    return {
+        "status": "ok",
+        "service": "idx-bei-api",
+        "version": "0.2.0",
+    }
+
+
+@app.get("/ready", tags=["System"])
+@app.get("/api/ready", tags=["System"])
+async def ready():
+    from idx.ops_status import readiness
+
+    payload = readiness()
+    if not payload.get("ready"):
+        return JSONResponse(status_code=503, content=payload)
+    return payload
+
+
+@app.get("/api/ops/status", tags=["System"])
+async def api_ops_status():
+    from idx.ops_status import ops_status
+
+    return ops_status()
 
 
 @app.get("/api/dashboard-data", tags=["Market Data"])
 async def get_dashboard_data():
-    """Return unified dashboard dataset containing companies with prices, super-insiders, and conglomerates."""
-    alpha_file = os.path.join(DATA_DIR, "network_alpha_data.json")
+    """Return unified dashboard dataset."""
+
+    alpha_file = os.path.join(
+        DATA_DIR,
+        "network_alpha_data.json",
+    )
+
     if os.path.exists(alpha_file):
         return load_json(alpha_file)
-    return {"companies": [], "super_insiders": [], "conglomerates": []}
+
+    return {
+        "companies": [],
+        "super_insiders": [],
+        "conglomerates": [],
+    }
 
 
 @app.get("/api/companies", tags=["Fundamental"])
 async def get_companies():
-    """Return list of all listed companies with financial metrics, governance, and prices."""
-    alpha_file = os.path.join(DATA_DIR, "network_alpha_data.json")
+    """Return all listed companies."""
+
+    alpha_file = os.path.join(
+        DATA_DIR,
+        "network_alpha_data.json",
+    )
+
     if os.path.exists(alpha_file):
         data = load_json(alpha_file)
         return data.get("companies", [])
+
     return []
 
 
 @app.get("/api/signals", tags=["Signals"])
 async def get_signals(
-    date: str | None = Query(None, description="Optional trading date (YYYY-MM-DD)"),
+    date: str | None = Query(
+        None,
+        description="Optional trading date (YYYY-MM-DD)",
+    ),
 ):
     cache_key = f"signals:{date or 'latest'}"
     cached = get_from_cache(cache_key, ttl_seconds=60.0)
@@ -144,57 +318,222 @@ async def get_signals(
 
     try:
         res = build_briefing(date=date)
+
         json_file = res.get("json")
-        result = load_json(json_file) if (json_file and os.path.exists(json_file)) else res
+
+        if json_file and os.path.exists(json_file):
+            result = load_json(json_file)
+        else:
+            # Never return write-metadata (alpha_rows / paths) as the briefing body.
+            result = {
+                "date": res.get("date"),
+                "trade_date": res.get("trade_date"),
+                "status": "PARTIAL",
+                "message": (
+                    "Briefing JSON artifact missing after generation — "
+                    "sections unavailable for this request."
+                ),
+                "composite_alpha_rankings": [],
+                "foreign_flow_radar": [],
+                "bandarmology_summary": {},
+                "top_brokers": [],
+                "stealth_accumulation": {
+                    "summary": "UNAVAILABLE",
+                    "signal": "UNAVAILABLE",
+                    "smart_money_delta": None,
+                    "anomalies": [],
+                },
+                "audit_risk_shield": [],
+                "dilution_watch": [],
+                "sharia_value_screen": [],
+                "pasar_nego_crossing": [],
+                "meta": {
+                    "alpha_rows": res.get("alpha_rows"),
+                    "markdown": res.get("markdown"),
+                    "json": res.get("json"),
+                },
+            }
         set_in_cache(cache_key, result)
         return result
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(
+            status_code=500,
+            detail=safe_http_detail(e, public="Signals unavailable"),
+        ) from e
+
+
+@app.get("/api/screener", tags=["Screener"])
+async def get_screener(
+    timeframe: str = Query(
+        "close_pressure",
+        description="close_pressure | swing | long_term",
+    ),
+    ticker: str | None = Query(None, description="Optional ticker filter"),
+    date: str | None = Query(None, description="As-of date YYYY-MM-DD"),
+    setup: str | None = Query(None, description="Exact setup filter"),
+    signal: str | None = Query(None, description="Signal label filter"),
+    limit: int = Query(25, ge=1, le=100),
+    cursor: int = Query(0, ge=0),
+    include_not_qualified: bool = Query(
+        False,
+        description="Include NOT_QUALIFIED rows (default false)",
+    ),
+    max_universe: int = Query(
+        80,
+        ge=1,
+        le=300,
+        description="Explicit universe scan cap (skipped_due_to_cap reported in meta)",
+    ),
+):
+    """Production screener: structure targets/stops, RR≥1:2, honest data quality.
+
+    Does not stream raw OHLC history to the client — only compact result rows.
+    """
+    try:
+        return run_screener(
+            timeframe=timeframe,
+            ticker=ticker.upper().strip() if ticker else None,
+            date=date,
+            setup=setup,
+            signal=signal,
+            limit=limit,
+            cursor=cursor,
+            include_not_qualified=include_not_qualified,
+            max_universe=max_universe,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=safe_http_detail(e, public="Screener unavailable"),
+        ) from e
 
 
 @app.get("/api/stock/{ticker}", tags=["Market Data"])
-async def get_stock_data(ticker: str, limit: int = 120):
-    import numpy as np
+async def get_stock_data(
+    ticker: str,
+    limit: int = 120,
+):
+    """
+    Return historical OHLCV data and technical indicators.
+
+    All NaN / NaT / +/-Inf values are converted to JSON null.
+    This prevents FastAPI/Starlette JSON serialization errors.
+    """
+
     import pandas as pd
 
-    ticker = ticker.upper()
-    df = query_dataset("stock_summary", where=f"StockCode = '{ticker}'")
+    try:
+        ticker = sanitize_ticker(ticker)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    df = query_dataset(
+        "stock_summary",
+        where=f"StockCode = '{ticker}'",
+    )
+
     if len(df) == 0:
-        raise HTTPException(status_code=404, detail=f"Ticker '{ticker}' not found.")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Ticker '{ticker}' not found.",
+        )
 
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-    df = df.sort_values("Date").reset_index(drop=True)
+    df["Date"] = pd.to_datetime(
+        df["Date"],
+        errors="coerce",
+    )
 
-    tech = compute_technical_indicators(df, ticker=ticker)
-    if limit and len(tech) > limit:
-        tech = tech.tail(limit).reset_index(drop=True)
+    df = (
+        df
+        .dropna(subset=["Date"])
+        .sort_values("Date", kind="mergesort")
+        .reset_index(drop=True)
+    )
 
-    # Standardize time and OHLC fields for charts
-    tech["time"] = tech["Date"].dt.strftime("%Y-%m-%d")
+    if len(df) == 0:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No valid dated records found for ticker '{ticker}'.",
+        )
+
+    # One row per calendar session (keep last write if duplicates exist).
+    df["_date_key"] = df["Date"].dt.strftime("%Y-%m-%d")
+    df = (
+        df
+        .drop_duplicates(subset=["_date_key"], keep="last")
+        .drop(columns=["_date_key"])
+        .reset_index(drop=True)
+    )
+
+    tech = compute_technical_indicators(
+        df,
+        ticker=ticker,
+    )
+
+    if limit and limit > 0 and len(tech) > limit:
+        tech = (
+            tech
+            .tail(limit)
+            .reset_index(drop=True)
+        )
+
+    tech["time"] = tech["Date"].dt.strftime(
+        "%Y-%m-%d"
+    )
+
     if "OpenPrice" in tech.columns:
-        tech["open"] = tech["OpenPrice"].fillna(tech["Close"])
+        tech["open"] = tech["OpenPrice"].fillna(
+            tech["Close"]
+        )
     else:
         tech["open"] = tech["Close"]
 
     if "High" in tech.columns:
-        tech["high"] = tech["High"].fillna(tech["Close"])
+        tech["high"] = tech["High"].fillna(
+            tech["Close"]
+        )
     else:
         tech["high"] = tech["Close"]
 
     if "Low" in tech.columns:
-        tech["low"] = tech["Low"].fillna(tech["Close"])
+        tech["low"] = tech["Low"].fillna(
+            tech["Close"]
+        )
     else:
         tech["low"] = tech["Close"]
 
     tech["close"] = tech["Close"]
-    tech["volume"] = tech["Volume"].fillna(0) if "Volume" in tech.columns else 0
 
-    # Clean NaNs and infs for strict JSON compliance
-    clean_df = tech.replace([np.inf, -np.inf], np.nan).where(pd.notnull(tech), None)
-    clean_df["Date"] = clean_df["Date"].astype(str)
+    if "Volume" in tech.columns:
+        tech["volume"] = tech["Volume"].fillna(0)
+    else:
+        tech["volume"] = 0
 
-    records = clean_df.to_dict(orient="records")
+    # Keep the normalized lowercase chart fields only.
+    # PowerShell treats JSON keys case-insensitively, so keeping both
+    # "High" and "high" causes ConvertFrom-Json / Invoke-RestMethod
+    # to see duplicate keys.
+    output_drop = [
+        "OpenPrice",
+        "High",
+        "Low",
+        "Close",
+        "Volume",
+    ]
+
+    output_df = tech.drop(
+        columns=[
+            column
+            for column in output_drop
+            if column in tech.columns
+        ],
+        errors="ignore",
+    )
+
+    records = dataframe_to_json_records(output_df)
     latest = records[-1] if records else {}
+
     return {
         "ticker": ticker,
         "records": records,
@@ -204,175 +543,179 @@ async def get_stock_data(ticker: str, limit: int = 120):
 
 @app.get("/api/stock/{ticker}/blocks", tags=["Market Data"])
 async def get_stock_blocks(ticker: str):
+    """
+    Return stock-level block/flow information using only data that is
+    actually present in stock_summary.
+
+    IMPORTANT:
+    stock_summary contains aggregate regular/non-regular trading fields,
+    but it does NOT contain buyer/seller broker transaction pairs.
+    Therefore this endpoint must never synthesize broker blocks.
+
+    When broker transaction detail is unavailable, ``blocks`` is returned
+    as an empty list and ``broker_blocks_available`` is False.
+    Missing numeric fields are null — never fabricated zeros.
+    """
+
     import pandas as pd
 
-    from idx.signals import INSTITUTIONAL_BROKERS, RETAIL_BROKERS
+    from idx.schema_version import attach_schema
+    from idx.ticker_safe import sanitize_ticker
 
-    ticker = ticker.upper()
-    df = query_dataset("stock_summary", where=f"StockCode = '{ticker}'")
+    try:
+        ticker = sanitize_ticker(ticker)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        df = query_dataset(
+            "stock_summary",
+            where=f"StockCode = '{ticker}'",
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
     if len(df) == 0:
-        raise HTTPException(status_code=404, detail=f"Ticker '{ticker}' not found.")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Ticker '{ticker}' not found.",
+        )
 
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-    df = df.sort_values("Date").reset_index(drop=True)
+    df["Date"] = pd.to_datetime(
+        df["Date"],
+        errors="coerce",
+    )
+
+    df = (
+        df
+        .dropna(subset=["Date"])
+        .sort_values("Date")
+        .reset_index(drop=True)
+    )
+
+    if len(df) == 0:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No valid dated records found for ticker '{ticker}'.",
+        )
+
     latest_row = df.iloc[-1]
 
     session_date = str(latest_row["Date"])[:10]
-    close_price = float(latest_row.get("Close", 0))
-    vwap_price = (
-        float(latest_row.get("VWAP", close_price))
-        if pd.notna(latest_row.get("VWAP"))
-        else close_price
-    )
-    non_reg_val = (
-        float(latest_row.get("NonRegularValue", 0))
-        if pd.notna(latest_row.get("NonRegularValue"))
-        else 0.0
-    )
-    non_reg_vol = (
-        float(latest_row.get("NonRegularVolume", 0))
-        if pd.notna(latest_row.get("NonRegularVolume"))
-        else 0.0
-    )
-    non_reg_freq = (
-        int(latest_row.get("NonRegularFrequency", 0))
-        if pd.notna(latest_row.get("NonRegularFrequency"))
-        else 0
-    )
-    reg_val = float(latest_row.get("Value", 0)) if pd.notna(latest_row.get("Value")) else 0.0
-    reg_vol = float(latest_row.get("Volume", 0)) if pd.notna(latest_row.get("Volume")) else 0.0
-    nff_val = (
-        float(latest_row.get("ForeignBuy", 0)) - float(latest_row.get("ForeignSell", 0))
-    ) * close_price
 
-    # Load official broker dictionary from brokerSearch.json
-    broker_names = {}
-    broker_search_file = os.path.join(DATA_DIR, "brokerSearch.json")
-    if os.path.exists(broker_search_file):
+    def _num(value, default=None):
+        """Null for missing/NaN — do not map unavailable → 0."""
         try:
-            bs = load_json(broker_search_file)
-            for b in bs.get("data", []):
-                broker_names[b.get("Code")] = b.get("Name")
-        except Exception:
-            pass
+            if value is None:
+                return default
+            if pd.isna(value):
+                return default
+            out = float(value)
+            if not math.isfinite(out):
+                return default
+            return out
+        except (TypeError, ValueError):
+            return default
 
-    # Read actual active brokers on this session from broker_summary.parquet
-    broker_path = os.path.join(DATA_DIR, "parquet", "broker_summary.parquet")
-    active_smart: list[dict] = []
-    active_retail: list[dict] = []
+    def _int(value, default=None):
+        try:
+            if value is None:
+                return default
+            if pd.isna(value):
+                return default
+            return int(value)
+        except (TypeError, ValueError):
+            return default
 
-    if os.path.exists(broker_path):
-        b_df = pd.read_parquet(broker_path)
-        b_df["Date"] = pd.to_datetime(b_df["Date"], errors="coerce")
-        day_b = b_df[b_df["Date"] == latest_row["Date"]]
-        if len(day_b) == 0:
-            day_b = b_df[b_df["Date"] == b_df["Date"].max()]
+    def _round_or_none(value, digits=2):
+        if value is None:
+            return None
+        return round(value, digits)
 
-        for _, brow in day_b.sort_values("Value", ascending=False).iterrows():
-            code = str(brow.get("IDFirm", ""))
-            name = broker_names.get(code, str(brow.get("FirmName", code)))
-            val = float(brow.get("Value", 0))
-            if code in INSTITUTIONAL_BROKERS:
-                active_smart.append({"code": code, "name": name, "value": val})
-            elif code in RETAIL_BROKERS:
-                active_retail.append({"code": code, "name": name, "value": val})
+    close_price = _num(latest_row.get("Close"))
 
-    if not active_smart:
-        active_smart = [
-            {"code": c, "name": broker_names.get(c, c)} for c in sorted(INSTITUTIONAL_BROKERS)[:6]
-        ]
-    if not active_retail:
-        active_retail = [
-            {"code": c, "name": broker_names.get(c, c)} for c in sorted(RETAIL_BROKERS)[:6]
-        ]
+    # VWAP only when column present; never silently alias Close as VWAP.
+    vwap_price = _num(latest_row.get("VWAP")) if "VWAP" in df.columns else None
 
-    # Generate verified block records based on the stock's actual session records
+    reg_val = _num(latest_row.get("Value"))
+    reg_vol = _num(latest_row.get("Volume"))
+    non_reg_val = _num(latest_row.get("NonRegularValue"))
+    non_reg_vol = _num(latest_row.get("NonRegularVolume"))
+    non_reg_freq = _int(latest_row.get("NonRegularFrequency"))
+    foreign_buy = _num(latest_row.get("ForeignBuy"))
+    foreign_sell = _num(latest_row.get("ForeignSell"))
+
+    # ForeignBuy / ForeignSell are share quantities in stock_summary.
+    # Net IDR only when both share legs and close are known.
+    nff_val = None
+    if (
+        foreign_buy is not None
+        and foreign_sell is not None
+        and close_price is not None
+    ):
+        nff_val = (foreign_buy - foreign_sell) * close_price
+
+    # stock_summary does not contain broker-level buyer/seller pairs.
+    #
+    # DO NOT manufacture blocks from:
+    #   - broker rankings
+    #   - institutional/retail classifications
+    #   - regular volume
+    #   - non-regular frequency
+    #
+    # Such calculations would create synthetic transactions that look
+    # like actual broker trades.
     blocks: list[dict] = []
-    total_trades_count = max(non_reg_freq, 5) if (non_reg_val > 0 or reg_val > 1e9) else 0
 
-    if total_trades_count > 0:
-        base_lots = int(non_reg_vol / 100) if non_reg_vol > 0 else int((reg_vol * 0.25) / 100)
-        lots_per_trade = max(100, base_lots // total_trades_count)
-        rem_lots = base_lots
+    broker_blocks_available = False
 
-        for i in range(total_trades_count):
-            trade_lots = (
-                lots_per_trade if i < total_trades_count - 1 else max(lots_per_trade, rem_lots)
-            )
-            rem_lots -= trade_lots
-            trade_val = trade_lots * 100 * vwap_price
-            is_whale = trade_val >= 500_000_000 or trade_lots >= 2000
-
-            smart_b = active_smart[i % len(active_smart)]
-            retail_s = active_retail[i % len(active_retail)]
-
-            if nff_val >= 0:
-                if i % 3 != 0:
-                    b_code, b_name, b_type = smart_b["code"], smart_b["name"], "INSTITUTIONAL"
-                    s_code, s_name, s_type = retail_s["code"], retail_s["name"], "RETAIL"
-                    trade_type = "WHALE_ACCUMULATION"
-                else:
-                    alt_smart = active_smart[(i + 1) % len(active_smart)]
-                    b_code, b_name, b_type = smart_b["code"], smart_b["name"], "INSTITUTIONAL"
-                    s_code, s_name, s_type = alt_smart["code"], alt_smart["name"], "INSTITUTIONAL"
-                    trade_type = "INSTITUTIONAL_CROSSING"
-            else:
-                if i % 3 != 0:
-                    b_code, b_name, b_type = retail_s["code"], retail_s["name"], "RETAIL"
-                    s_code, s_name, s_type = smart_b["code"], smart_b["name"], "INSTITUTIONAL"
-                    trade_type = "WHALE_DUMP"
-                else:
-                    alt_smart = active_smart[(i + 1) % len(active_smart)]
-                    b_code, b_name, b_type = smart_b["code"], smart_b["name"], "INSTITUTIONAL"
-                    s_code, s_name, s_type = alt_smart["code"], alt_smart["name"], "INSTITUTIONAL"
-                    trade_type = "INSTITUTIONAL_CROSSING"
-
-            blocks.append(
-                {
-                    "id": f"{ticker}-{session_date}-{i + 1}",
-                    "time": f"Session {session_date}",
-                    "price": round(vwap_price, 2),
-                    "lots": int(trade_lots),
-                    "value_rp": round(trade_val, 2),
-                    "buyer_broker": b_code,
-                    "buyer_name": b_name,
-                    "buyer_type": b_type,
-                    "seller_broker": s_code,
-                    "seller_name": s_name,
-                    "seller_type": s_type,
-                    "trade_type": trade_type,
-                    "is_whale": is_whale,
-                }
-            )
-
-    total_whale_val = sum(b["value_rp"] for b in blocks if b["is_whale"])
-    smart_buys = sum(1 for b in blocks if b["is_whale"] and b["buyer_type"] == "INSTITUTIONAL")
-    whale_count = sum(1 for b in blocks if b["is_whale"])
-    smart_ratio = (
-        round((smart_buys / whale_count * 100.0), 1)
-        if whale_count > 0
-        else (100.0 if nff_val >= 0 else 0.0)
+    return attach_schema(
+        json_safe(
+            {
+                "ticker": ticker,
+                "date": session_date,
+                "as_of": session_date,
+                "source": "stock_summary",
+                "quality": "B",
+                "total_turnover_rp": _round_or_none(reg_val),
+                "regular_volume_shares": _round_or_none(reg_vol),
+                "vwap_price": _round_or_none(vwap_price),
+                "vwap_status": (
+                    "AVAILABLE" if vwap_price is not None else "UNAVAILABLE"
+                ),
+                "non_regular_value_rp": _round_or_none(non_reg_val),
+                "non_regular_volume_shares": _round_or_none(non_reg_vol),
+                "non_regular_frequency": non_reg_freq,
+                "foreign_buy_shares": _round_or_none(foreign_buy),
+                "foreign_sell_shares": _round_or_none(foreign_sell),
+                "net_foreign_flow_rp": _round_or_none(nff_val),
+                "broker_blocks_available": broker_blocks_available,
+                "broker_blocks_source": "unavailable",
+                # Whale / smart-accumulation require transaction tape — never invent 0.
+                "total_whale_value_rp": None,
+                "smart_accumulation_ratio": None,
+                "blocks": blocks,
+                "note": (
+                    "Aggregate session flow from stock_summary. "
+                    "Not broker attribution, not whale radar, not transaction tape."
+                ),
+            }
+        )
     )
-
-    return {
-        "ticker": ticker,
-        "date": session_date,
-        "total_turnover_rp": reg_val,
-        "non_regular_value_rp": non_reg_val,
-        "non_regular_volume_shares": non_reg_vol,
-        "non_regular_frequency": non_reg_freq,
-        "net_foreign_flow_rp": round(nff_val, 2),
-        "total_whale_value_rp": total_whale_val,
-        "smart_accumulation_ratio": smart_ratio,
-        "blocks": blocks,
-    }
-
 
 @app.get("/api/broker-flow", tags=["Bandarmology"])
-async def get_broker_flow(date: str | None = None, top_k: int = 10):
+async def get_broker_flow(
+    date: str | None = None,
+    top_k: int = 10,
+):
     import pandas as pd
 
-    broker_path = os.path.join(DATA_DIR, "parquet", "broker_summary.parquet")
+    broker_path = os.path.join(
+        DATA_DIR,
+        "parquet",
+        "broker_summary.parquet",
+    )
+
     if not os.path.exists(broker_path):
         from idx.core.timeseries import read_dataset
 
@@ -381,24 +724,50 @@ async def get_broker_flow(date: str | None = None, top_k: int = 10):
         df = pd.read_parquet(broker_path)
 
     if len(df) == 0:
-        raise HTTPException(status_code=404, detail="Broker summary data not available.")
+        raise HTTPException(
+            status_code=404,
+            detail="Broker summary data not available.",
+        )
 
-    summary, top_df = broker_concentration_screen(df, on_date=date, top_k=top_k)
-    return {"summary": summary, "top_brokers": top_df.to_dict("records")}
+    summary, top_df = broker_concentration_screen(
+        df,
+        on_date=date,
+        top_k=top_k,
+    )
+
+    return {
+        "summary": json_safe(summary),
+        "top_brokers": dataframe_to_json_records(top_df),
+    }
 
 
 @app.get("/api/peers/{ticker}", tags=["Fundamental"])
 async def get_peers(ticker: str):
     import pandas as pd
 
-    ticker = ticker.upper()
-    ratios_path = os.path.join(DATA_DIR, "parquet", "financial_ratios.parquet")
+    ratios_path = os.path.join(
+        DATA_DIR,
+        "parquet",
+        "financial_ratios.parquet",
+    )
+
     if not os.path.exists(ratios_path):
-        raise HTTPException(status_code=404, detail="Financial ratios parquet not found.")
+        raise HTTPException(
+            status_code=404,
+            detail="Financial ratios parquet not found.",
+        )
 
     df = pd.read_parquet(ratios_path)
-    latest = df.sort_values("fsDate").groupby("code").last().reset_index()
-    return latest.to_dict("records")
+
+    latest = (
+        df
+        .sort_values("fsDate")
+        .groupby("code")
+        .last()
+        .reset_index()
+    )
+
+    return dataframe_to_json_records(latest)
 
 
 @app.get("/api/dividend/{ticker}", tags=["Dividends"])
@@ -406,58 +775,125 @@ async def get_dividend_analysis(ticker: str):
     from idx.dividend import analyze_stock_dividend
 
     res = analyze_stock_dividend(ticker)
+
     if not res.get("has_dividend"):
-        raise HTTPException(status_code=404, detail=res.get("message", "Dividend data not found"))
-    return res
+        raise HTTPException(
+            status_code=404,
+            detail=res.get(
+                "message",
+                "Dividend data not found",
+            ),
+        )
+
+    return json_safe(res)
 
 
 @app.get("/api/dividend", tags=["Dividends"])
-async def screen_dividends(min_yield: float = 3.0, year: str = "2026", limit: int = 25):
+async def screen_dividends(
+    min_yield: float = 3.0,
+    year: str = "2026",
+    limit: int = 25,
+):
     from idx.dividend import screen_upcoming_dividends
 
-    df = screen_upcoming_dividends(min_yield=min_yield, year_filter=year, limit=limit)
-    return df.to_dict("records")
+    df = screen_upcoming_dividends(
+        min_yield=min_yield,
+        year_filter=year,
+        limit=limit,
+    )
+
+    return dataframe_to_json_records(df)
 
 
 @app.get("/api/drift", tags=["Ownership"])
 async def get_drift():
-    return get_latest_shareholder_drift()
+    return json_safe(
+        get_latest_shareholder_drift()
+    )
 
 
 @app.get("/api/graph/ubo/{ticker}", tags=["Knowledge Graph"])
 async def get_ubo(ticker: str):
-    return get_ubo_tree(ticker)
+    return json_safe(
+        get_ubo_tree(ticker)
+    )
 
 
 @app.get("/api/graph/network/{ticker}", tags=["Knowledge Graph"])
 async def get_network(ticker: str):
     data = get_company_network(ticker)
+
     if not data.get("nodes"):
-        raise HTTPException(status_code=404, detail=f"No graph network found for {ticker}")
-    return data
+        raise HTTPException(
+            status_code=404,
+            detail=f"No graph network found for {ticker}",
+        )
+
+    return json_safe(data)
 
 
 @app.get("/api/graph/centrality", tags=["Knowledge Graph"])
 async def get_centrality(top_n: int = 20):
     df = calculate_board_centrality(top_n=top_n)
-    return df.to_dict(orient="records")
+
+    return dataframe_to_json_records(df)
 
 
 @app.get("/api/graph/cross-holdings", tags=["Knowledge Graph"])
 async def get_cross():
-    return detect_cross_holdings()
+    return json_safe(
+        detect_cross_holdings()
+    )
 
 
 @app.post("/api/query/sql", tags=["Analytics"])
 async def execute_sql(req: SQLQueryRequest):
+    if _is_production_env():
+        raise HTTPException(
+            status_code=403,
+            detail="SQL analytics endpoint is disabled in production.",
+        )
+
     sql = req.sql.strip()
-    disallowed = ["insert ", "update ", "delete ", "drop ", "create ", "alter ", "truncate "]
-    if any(word in sql.lower() for word in disallowed):
-        raise HTTPException(status_code=400, detail="Only read-only SELECT queries are allowed.")
+    lowered = sql.lower()
+
+    disallowed = [
+        "insert ",
+        "update ",
+        "delete ",
+        "drop ",
+        "create ",
+        "alter ",
+        "truncate ",
+        "attach ",
+        "copy ",
+        "export ",
+        "pragma ",
+        "install ",
+        "load ",
+        "call ",
+    ]
+
+    if any(word in lowered for word in disallowed):
+        raise HTTPException(
+            status_code=400,
+            detail="Only read-only SELECT queries are allowed.",
+        )
+    if ";" in sql.rstrip(";"):
+        raise HTTPException(
+            status_code=400,
+            detail="Multi-statement SQL is not allowed.",
+        )
+    if not lowered.lstrip().startswith("select"):
+        raise HTTPException(
+            status_code=400,
+            detail="Only SELECT queries are allowed.",
+        )
 
     import duckdb
 
     con = duckdb.connect(database=":memory:")
+
     table_names = [
         "stock_summary",
         "financial_ratios",
@@ -465,16 +901,38 @@ async def execute_sql(req: SQLQueryRequest):
         "broker_summary",
         "index_summary",
     ]
+
     for name in table_names:
-        p_file = os.path.join(DATA_DIR, "parquet", f"{name}.parquet")
+
+        p_file = os.path.join(
+            DATA_DIR,
+            "parquet",
+            f"{name}.parquet",
+        )
+
         if os.path.exists(p_file):
-            con.execute(f"CREATE OR REPLACE VIEW {name} AS SELECT * FROM read_parquet('{p_file}')")
+            con.execute(
+                f"CREATE OR REPLACE VIEW {name} "
+                f"AS SELECT * FROM read_parquet('{p_file}')"
+            )
 
     try:
+
         res_df = con.execute(sql).fetchdf()
-        return res_df.head(req.limit).to_dict(orient="records")
+
+        return dataframe_to_json_records(
+            res_df.head(req.limit)
+        )
+
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+
+        raise HTTPException(
+            status_code=400,
+            detail=safe_http_detail(e, public="Invalid query"),
+        ) from e
+
+    finally:
+        con.close()
 
 
 @app.get("/api/stealth-accumulation", tags=["Bandarmology"])
@@ -492,11 +950,29 @@ async def get_stealth_accumulation(
 
     from idx.signals import detect_stealth_accumulation
 
-    broker_path = os.path.join(DATA_DIR, "parquet", "broker_summary.parquet")
-    stock_path = os.path.join(DATA_DIR, "parquet", "stock_summary.parquet")
+    broker_path = os.path.join(
+        DATA_DIR,
+        "parquet",
+        "broker_summary.parquet",
+    )
 
-    broker_df = pd.read_parquet(broker_path) if os.path.exists(broker_path) else pd.DataFrame()
-    stock_df = pd.read_parquet(stock_path) if os.path.exists(stock_path) else pd.DataFrame()
+    stock_path = os.path.join(
+        DATA_DIR,
+        "parquet",
+        "stock_summary.parquet",
+    )
+
+    broker_df = (
+        pd.read_parquet(broker_path)
+        if os.path.exists(broker_path)
+        else pd.DataFrame()
+    )
+
+    stock_df = (
+        pd.read_parquet(stock_path)
+        if os.path.exists(stock_path)
+        else pd.DataFrame()
+    )
 
     res = detect_stealth_accumulation(
         broker_df,
@@ -505,23 +981,35 @@ async def get_stealth_accumulation(
         lookback_days=lookback_days,
         min_turnover_rp=min_turnover_rp,
     )
+
     result = {
-        "summary": res["summary"],
-        "signal": res["signal"],
-        "smart_money_delta": res["smart_money_delta"],
-        "anomalies": res["anomalies_df"].to_dict("records"),
+        "summary": json_safe(
+            res["summary"]
+        ),
+        "signal": json_safe(
+            res["signal"]
+        ),
+        "smart_money_delta": json_safe(
+            res["smart_money_delta"]
+        ),
+        "anomalies": dataframe_to_json_records(
+            res["anomalies_df"]
+        ),
     }
     set_in_cache(cache_key, result)
     return result
 
 
 @app.post("/api/backtest", tags=["Backtesting"])
-async def backtest_strategy(req: BacktestRequest):
+async def backtest_strategy(
+    req: BacktestRequest,
+):
     import numpy as np
 
     from idx.backtest import run_backtest
 
     try:
+
         metrics, trades_df = run_backtest(
             strategy=req.strategy,
             holding_days=req.holding_days,
@@ -534,71 +1022,152 @@ async def backtest_strategy(req: BacktestRequest):
             position_sizing=req.position_sizing,
         )
 
-        # Sanitize metrics floats for JSON compliance
-        cleaned_metrics: dict[str, object] = {}
-        for k, v in metrics.items():
-            if isinstance(v, float) and (np.isnan(v) or np.isinf(v)):
-                cleaned_metrics[k] = None
+        cleaned_metrics = {}
+
+        for key, value in metrics.items():
+
+            if isinstance(
+                value,
+                (float, np.floating),
+            ):
+
+                if np.isnan(value) or np.isinf(value):
+                    cleaned_metrics[key] = None
+                else:
+                    cleaned_metrics[key] = (
+                        value.item()
+                        if hasattr(value, "item")
+                        else value
+                    )
+
             else:
-                cleaned_metrics[k] = v
+                cleaned_metrics[key] = json_safe(value)
+
+        # CAGR must never be a silent alias of total return at the API boundary.
+        if cleaned_metrics.get("cagr_pct") is not None and cleaned_metrics.get(
+            "total_return_pct"
+        ) is not None:
+            if cleaned_metrics["cagr_pct"] == cleaned_metrics["total_return_pct"]:
+                cleaned_metrics["cagr_pct"] = None
 
         trades_list: list[dict] = []
         equity_curve: list[dict[str, object]] = []
 
         if len(trades_df) > 0:
-            trades_df_sorted = trades_df.sort_values("ExitDate")
+
+            trades_df_sorted = trades_df.sort_values(
+                ["ExitDate", "EntryDate", "StockCode"]
+            )
+
             running_equity = 100.0
+
             first_entry = str(trades_df_sorted.iloc[0]["EntryDate"])
-            equity_curve.append({"time": first_entry, "value": 100.0})
 
-            # Calculate portfolio equity growth across rebalancing periods
-            for exit_dt, group in trades_df_sorted.groupby("ExitDate"):
+            equity_curve.append(
+                {
+                    "time": first_entry,
+                    "value": 100.0,
+                }
+            )
+
+            # Equal-weight mean return per ExitDate — matches engine portfolio metrics.
+            for exit_dt, group in trades_df_sorted.groupby("ExitDate", sort=True):
                 avg_period_return = float(group["Return"].mean())
+                if not math.isfinite(avg_period_return):
+                    continue
                 running_equity *= 1.0 + avg_period_return
-                equity_curve.append({"time": str(exit_dt), "value": round(running_equity, 2)})
+                if not math.isfinite(running_equity):
+                    running_equity = equity_curve[-1]["value"]  # type: ignore[index]
+                    break
+                equity_curve.append(
+                    {
+                        "time": str(exit_dt),
+                        "value": round(float(running_equity), 2),
+                    }
+                )
 
-            trades_list = (
-                trades_df.replace({np.nan: None})
+            trades_clean = (
+                trades_df_sorted.replace({np.nan: None})
                 .sort_values("ExitDate", ascending=False)
                 .head(100)
-                .to_dict("records")
             )
+
+            trades_list = dataframe_to_json_records(trades_clean)
+
+            # Ensure trade count reflects the full engine set, not the truncated table.
+            cleaned_metrics["total_trades"] = int(len(trades_df))
+            cleaned_metrics["trades_returned"] = int(len(trades_list))
+
         else:
-            equity_curve.append({"time": "2026-01-01", "value": 100.0})
+            # No fabricated placeholder date — empty curve for zero-trade runs.
+            equity_curve = []
+            cleaned_metrics["total_trades"] = int(
+                cleaned_metrics.get("total_trades") or 0
+            )
+            cleaned_metrics["trades_returned"] = 0
 
         return {
             "metrics": cleaned_metrics,
             "equity_curve": equity_curve,
             "trades": trades_list,
         }
+
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+
+        raise HTTPException(
+            status_code=400,
+            detail=safe_http_detail(e, public="Backtest failed"),
+        ) from e
 
 
 class ConnectionManager:
-    """Manages active WebSocket client connections and broadcasts live market events."""
+    """Manages active WebSocket client connections."""
 
     def __init__(self):
         self.active_connections: list[WebSocket] = []
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(
+        self,
+        websocket: WebSocket,
+    ):
         await websocket.accept()
-        self.active_connections.append(websocket)
+        self.active_connections.append(
+            websocket
+        )
 
-    def disconnect(self, websocket: WebSocket):
+    def disconnect(
+        self,
+        websocket: WebSocket,
+    ):
         if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
+            self.active_connections.remove(
+                websocket
+            )
 
-    async def broadcast(self, message: dict):
-        payload = json.dumps(message, default=str)
+    async def broadcast(
+        self,
+        message: dict,
+    ):
+        payload = json.dumps(
+            message,
+            default=str,
+            allow_nan=False,
+        )
+
         dead = []
+
         for conn in self.active_connections:
+
             try:
-                await conn.send_text(payload)
+                await conn.send_text(
+                    payload
+                )
+
             except Exception:
                 dead.append(conn)
-        for d in dead:
-            self.disconnect(d)
+
+        for connection in dead:
+            self.disconnect(connection)
 
 
 ws_manager = ConnectionManager()
@@ -606,29 +1175,73 @@ ws_manager = ConnectionManager()
 
 @app.post("/api/broadcast", tags=["System"])
 async def broadcast_event(event: dict):
-    """Broadcasts a live event payload to all connected dashboard WebSockets."""
     await ws_manager.broadcast(event)
-    return {"status": "broadcast_sent", "active_clients": len(ws_manager.active_connections)}
+
+    return {
+        "status": "broadcast_sent",
+        "active_clients": len(
+            ws_manager.active_connections
+        ),
+    }
 
 
-@app.get("/api/system/ingestion-status", tags=["Ingestion & Data Pipeline"])
+@app.get(
+    "/api/system/ingestion-status",
+    tags=["Ingestion & Data Pipeline"],
+)
 async def api_ingestion_status():
-    """Returns comprehensive dataset inventory, calendar gaps, and tiered backfill recommendations."""
     return get_full_ingestion_status()
 
 
-@app.post("/api/system/trigger-ingestion", tags=["Ingestion & Data Pipeline"])
-async def api_trigger_ingestion(req: TriggerIngestionRequest):
-    """Triggers an async daily ingestion or historical backfill task in the background."""
+@app.post(
+    "/api/system/trigger-ingestion",
+    tags=["Ingestion & Data Pipeline"],
+)
+async def api_trigger_ingestion(
+    req: TriggerIngestionRequest,
+):
     import uuid
 
-    job_id = f"job-{uuid.uuid4().hex[:8]}"
-    params = {
+    from idx.ingestion import (
+        normalize_backfill_date_range,
+        validate_ownership_path_or_url,
+    )
+
+    if req.job_type not in _ALLOWED_INGESTION_JOB_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unsupported job_type '{req.job_type}'. "
+                f"Allowed: {sorted(_ALLOWED_INGESTION_JOB_TYPES)}"
+            ),
+        )
+
+    params: dict = {
         "date": req.date,
         "start_date": req.start_date,
         "end_date": req.end_date,
         "concurrency": req.concurrency,
+        "path_or_url": req.path_or_url,
     }
+
+    # Fail fast with clear errors (no invented defaults).
+    if req.job_type == "backfill":
+        try:
+            start, end = normalize_backfill_date_range(req.start_date, req.end_date)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        params["start_date"] = start
+        params["end_date"] = end
+    elif req.job_type == "ownership":
+        try:
+            params["path_or_url"] = validate_ownership_path_or_url(req.path_or_url)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    job_id = (
+        f"job-{uuid.uuid4().hex[:8]}"
+    )
+
     asyncio.create_task(
         run_async_ingestion_job(
             job_id=job_id,
@@ -637,75 +1250,142 @@ async def api_trigger_ingestion(req: TriggerIngestionRequest):
             broadcast_callback=ws_manager.broadcast,
         )
     )
+
+    label = {
+        "daily": "Daily market-close",
+        "backfill": "Historical backfill",
+        "sync_all": "Sync All Data",
+        "ownership": "Ownership (KSEI) ingest",
+    }.get(req.job_type, req.job_type)
+
     return {
         "job_id": job_id,
         "status": "scheduled",
         "job_type": req.job_type,
-        "message": f"{req.job_type.capitalize()} job triggered in background.",
+        "message": f"{label} job triggered in background.",
+        "params": {
+            k: params[k]
+            for k in ("start_date", "end_date", "path_or_url", "concurrency", "date")
+            if params.get(k) is not None
+        },
     }
 
 
-@app.get("/api/system/jobs", tags=["Ingestion & Data Pipeline"])
+@app.get(
+    "/api/system/jobs",
+    tags=["Ingestion & Data Pipeline"],
+)
 async def api_list_jobs(limit: int = 10):
-    """List recent background ingestion and backfill jobs."""
     return list_recent_jobs(limit=limit)
 
 
-@app.get("/api/system/jobs/{job_id}", tags=["Ingestion & Data Pipeline"])
+@app.get(
+    "/api/system/jobs/{job_id}",
+    tags=["Ingestion & Data Pipeline"],
+)
 async def api_get_job(job_id: str):
-    """Get status of a specific background job."""
     job = get_job_status(job_id)
+
     if not job:
-        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found.")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Job '{job_id}' not found.",
+        )
+
     return job
 
 
 @app.websocket("/ws/stream")
-async def websocket_stream(websocket: WebSocket):
+async def websocket_stream(
+    websocket: WebSocket,
+):
     await ws_manager.connect(websocket)
+
     try:
-        # Welcome handshake
+
         await websocket.send_text(
             json.dumps(
                 {
                     "type": "handshake",
                     "status": "connected",
                     "service": "idx-microservice-stream",
-                    "timestamp": asyncio.get_event_loop().time(),
-                }
+                    "timestamp": (
+                        asyncio
+                        .get_event_loop()
+                        .time()
+                    ),
+                },
+                allow_nan=False,
             )
         )
+
         while True:
-            # Check for incoming client messages or wait
+
             try:
-                msg = await asyncio.wait_for(websocket.receive_text(), timeout=5.0)
+
+                msg = await asyncio.wait_for(
+                    websocket.receive_text(),
+                    timeout=5.0,
+                )
+
                 data = json.loads(msg)
+
                 if data.get("type") == "ping":
+
                     await websocket.send_text(
-                        json.dumps({"type": "pong", "time": asyncio.get_event_loop().time()})
+                        json.dumps(
+                            {
+                                "type": "pong",
+                                "time": (
+                                    asyncio
+                                    .get_event_loop()
+                                    .time()
+                                ),
+                            },
+                            allow_nan=False,
+                        )
                     )
+
             except TimeoutError:
-                # Periodic heartbeat with market status
+
                 await websocket.send_text(
                     json.dumps(
                         {
                             "type": "heartbeat",
                             "status": "alive",
-                            "timestamp": asyncio.get_event_loop().time(),
-                            "connected_clients": len(ws_manager.active_connections),
-                        }
+                            "timestamp": (
+                                asyncio
+                                .get_event_loop()
+                                .time()
+                            ),
+                            "connected_clients": len(
+                                ws_manager.active_connections
+                            ),
+                        },
+                        allow_nan=False,
                     )
                 )
+
     except WebSocketDisconnect:
+
         ws_manager.disconnect(websocket)
+
     except Exception:
+
         ws_manager.disconnect(websocket)
 
 
-def run_server(host: str = "0.0.0.0", port: int = 8000):
+def run_server(
+    host: str = "0.0.0.0",
+    port: int = 8000,
+):
     import uvicorn
 
-    uvicorn.run(app, host=host, port=port)
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+    )
 
 
 if __name__ == "__main__":

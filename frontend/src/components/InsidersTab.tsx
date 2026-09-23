@@ -77,7 +77,10 @@ export const InsidersTab: React.FC<InsidersTabProps> = ({
                         stake
                       </span>
                       <span className="numeric" style={{ fontWeight: 600 }}>
-                        {h.percentage.toFixed(2)}% ({formatCurrency(hVal)})
+                        {typeof h.percentage === 'number' && Number.isFinite(h.percentage)
+                          ? `${h.percentage.toFixed(2)}%`
+                          : '—'}{' '}
+                        ({formatCurrency(hVal)})
                       </span>
                     </div>
                   );

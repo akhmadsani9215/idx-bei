@@ -61,12 +61,14 @@ export const BandarmologyTab: React.FC<BandarmologyTabProps> = ({ onSelectStock 
   });
 
   const summaryObj = typeof data?.summary === 'object' && data.summary !== null ? data.summary : null;
-  const summaryText =
-    typeof data?.summary === 'string'
-      ? data.summary
-      : summaryObj
-      ? `On session ${summaryObj.on_date}, Smart Money Turnover reached Rp ${summaryObj.smart_money_turnover_rp_b?.toLocaleString()}B vs Retail Rp ${summaryObj.retail_turnover_rp_b?.toLocaleString()}B. Detected ${summaryObj.anomalies_detected} stocks exhibiting significant accumulation divergence.`
-      : (data ? 'No abnormal institutional accumulation detected for this trading session.' : 'Analyzing market-wide broker transactions...');
+  const attributionAvailable = summaryObj?.broker_attribution_available === true;
+  // While attribution is unavailable, do not present stealth/retail-trap rows as validated.
+  const displayAnomalies: StealthAnomaly[] = attributionAvailable ? filteredAnomalies : [];
+  const summaryText = data
+    ? (attributionAvailable
+      ? `Session ${summaryObj?.on_date ?? '—'}: broker attribution available.`
+      : 'Unavailable: broker-to-participant attribution has not been verified.')
+    : 'Loading broker summary...';
 
   return (
     <div className="bandarmology-tab" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -84,10 +86,10 @@ export const BandarmologyTab: React.FC<BandarmologyTabProps> = ({ onSelectStock 
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
             <Radar size={28} style={{ color: '#38bdf8' }} />
-            <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 700 }}>Bandarmology & Institutional Radar</h2>
+            <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 700 }}>Bandarmology & Broker Summary</h2>
           </div>
           <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            Unmask quiet institutional accumulation, retail liquidity traps, and broker dominance shifts across the Indonesia Stock Exchange.
+            Review available broker concentration and market-flow data. Broker-to-participant attribution is not currently verified.
           </p>
         </div>
         <button
@@ -114,14 +116,14 @@ export const BandarmologyTab: React.FC<BandarmologyTabProps> = ({ onSelectStock 
           padding: '1.25rem',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-            <span>Smart Money Delta</span>
+            <span>Broker Attribution Delta</span>
             <Activity size={18} style={{ color: '#38bdf8' }} />
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '0.5rem', color: (data?.smart_money_delta ?? 0) >= 1.0 ? '#10b981' : '#ef4444' }}>
-            {data?.smart_money_delta !== undefined ? `${data.smart_money_delta}x` : '—'}
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '0.5rem', color: attributionAvailable ? '#10b981' : '#94a3b8' }}>
+            {attributionAvailable && data?.smart_money_delta != null ? `${data.smart_money_delta}x` : 'N/A'}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-            Institutional vs Retail broker turnover ratio
+            Requires a verified broker-to-participant mapping
           </div>
         </div>
 
@@ -136,10 +138,10 @@ export const BandarmologyTab: React.FC<BandarmologyTabProps> = ({ onSelectStock 
             <TrendingUp size={18} style={{ color: '#10b981' }} />
           </div>
           <div style={{ fontSize: '1.6rem', fontWeight: 800, marginTop: '0.5rem', color: '#10b981' }}>
-            {data?.signal || 'NEUTRAL'}
+            {attributionAvailable ? (data?.signal || 'NEUTRAL') : 'UNAVAILABLE'}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-            Dominant order flow pressure
+            Participant attribution status
           </div>
         </div>
 
@@ -154,10 +156,10 @@ export const BandarmologyTab: React.FC<BandarmologyTabProps> = ({ onSelectStock 
             <AlertTriangle size={18} style={{ color: '#f59e0b' }} />
           </div>
           <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '0.5rem', color: '#f59e0b' }}>
-            {anomalies.length} Stocks
+            {attributionAvailable ? anomalies.length : 0} Stocks
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-            Stocks exhibiting accumulation divergence
+            Validated attribution anomalies only (none while unavailable)
           </div>
         </div>
 
@@ -168,14 +170,14 @@ export const BandarmologyTab: React.FC<BandarmologyTabProps> = ({ onSelectStock 
           padding: '1.25rem',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-            <span>Institutional Flow</span>
+            <span>Participant Turnover</span>
             <Users size={18} style={{ color: '#c084fc' }} />
           </div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '0.5rem', color: '#c084fc' }}>
-            {summaryObj ? `Rp ${(summaryObj.smart_money_turnover_rp_b / 1000).toFixed(1)}T` : 'Active'}
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '0.5rem', color: '#94a3b8' }}>
+            N/A
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-            Smart money session turnover
+            Broker-to-participant attribution unavailable
           </div>
         </div>
       </div>
@@ -183,7 +185,7 @@ export const BandarmologyTab: React.FC<BandarmologyTabProps> = ({ onSelectStock 
       {loading && !data && (
         <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
           <Loader2 size={36} className="spinning" style={{ margin: '0 auto 1rem', color: '#38bdf8' }} />
-          <p>Scanning broker summaries & detecting stealth flow...</p>
+          <p>Loading broker concentration summary...</p>
         </div>
       )}
 
@@ -293,9 +295,13 @@ export const BandarmologyTab: React.FC<BandarmologyTabProps> = ({ onSelectStock 
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700 }}>Stealth Flow & Wyckoff Anomalies ({filteredAnomalies.length})</h3>
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700 }}>
+                  Broker Attribution Signals ({displayAnomalies.length})
+                </h3>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  Institutional absorption vs retail liquidity traps over {lookbackDays}-session window
+                  {attributionAvailable
+                    ? `Institutional absorption vs retail liquidity traps over ${lookbackDays}-session window`
+                    : 'Stealth / retail-trap signals require verified broker attribution (currently unavailable)'}
                 </span>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -340,10 +346,10 @@ export const BandarmologyTab: React.FC<BandarmologyTabProps> = ({ onSelectStock 
               </div>
             </div>
 
-            {filteredAnomalies.length === 0 ? (
+            {!attributionAvailable || displayAnomalies.length === 0 ? (
               <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
                 <Eye size={32} style={{ margin: '0 auto 0.5rem', opacity: 0.5 }} />
-                <p>No anomalies detected under the current filter.</p>
+                <p>Attribution unavailable — no validated stealth or retail-trap signals.</p>
               </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
@@ -361,7 +367,7 @@ export const BandarmologyTab: React.FC<BandarmologyTabProps> = ({ onSelectStock 
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredAnomalies.map((a, idx) => {
+                    {displayAnomalies.map((a, idx) => {
                       const isStealth = a.Signal === 'STEALTH_ACCUMULATION';
                       const isMarkup = a.Signal === 'MARKUP_CONFIRMATION';
                       const isTrap = a.Signal === 'RETAIL_TRAP';
@@ -519,13 +525,13 @@ export const BandarmologyTab: React.FC<BandarmologyTabProps> = ({ onSelectStock 
               <h3 style={{ margin: '0 0 1rem', fontSize: '1.05rem', fontWeight: 700 }}>Bandarmology Rules</h3>
               <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
                 <li>
-                  <strong style={{ color: '#34d399' }}>Stealth Accumulation:</strong> High institutional net buying (Foreign Flow ratio &gt; 15%) while price remains flat (&le; 1.0%). Smart money is quietly absorbing supply without spiking prices.
+                  <strong style={{ color: '#38bdf8' }}>Broker concentration:</strong> CR1/CR3/CR5 measure top-broker turnover share from actual broker_summary values — not participant identity.
                 </li>
                 <li>
-                  <strong style={{ color: '#f87171' }}>Retail Trap:</strong> Price gain (&gt; 1.0%) accompanied by heavy institutional net distribution (Foreign Flow ratio &lt; -15%). Retail buyers are bidding into smart money exit orders.
+                  <strong style={{ color: '#94a3b8' }}>Institutional / retail labels:</strong> Not inferred. No verified map from broker codes to institutional or retail participants.
                 </li>
                 <li>
-                  <strong style={{ color: '#38bdf8' }}>Smart Money Delta:</strong> Ratio of institutional broker turnover (AK, BK, ZP, RX, CC) to retail broker turnover (YP, PD, XC, NI).
+                  <strong style={{ color: '#f59e0b' }}>Stealth accumulation:</strong> Unavailable until broker-to-participant attribution is verified. Foreign aggregate flow is not treated as smart money.
                 </li>
               </ul>
             </div>

@@ -8,7 +8,7 @@ Evaluates:
 1. Dividend Yield & Net After-Tax Return (UU HPP 10% / 0% reinvested).
 2. Dividend Payout Ratio (DPR) & Earnings Sustainability (EPS, ROE, DER).
 3. Dividend Trap Risk Score (0-100) across 5 risk dimensions.
-4. Smart Money Flow (Net Foreign Flow & Institutional Accumulation/Distribution).
+4. Foreign Flow (Net Foreign Flow inflow / outflow).
 5. Technical Regime (20-day run-up euphoria & RSI-14 overbought level).
 6. Actionable Recommendation (BUY / HOLD / SELL BEFORE CUM DATE) with tactical execution playbook.
 """
@@ -20,7 +20,7 @@ from typing import Any
 
 import pandas as pd
 
-from idx.core.currency import get_usd_idr_rate
+from idx.core.currency import resolve_usd_idr_quote
 from idx.core.utils import DATA_DIR, get_logger, load_json
 
 log = get_logger("idx.dividend")
@@ -99,8 +99,25 @@ def analyze_stock_dividend(
         Structured analysis dictionary with metrics, risk score, and verdict.
     """
     ticker = ticker.upper().strip()
+    fx_quote: dict[str, Any] | None = None
     if usd_rate is None or usd_rate <= 0:
-        usd_rate = get_usd_idr_rate()
+        fx_quote = resolve_usd_idr_quote()
+        usd_rate = float(fx_quote["rate"] if fx_quote.get("rate") is not None else 16200.0)
+    else:
+        # Caller-supplied rate — still label honestly (not claimed as live/verified).
+        fx_quote = {
+            "rate": float(usd_rate),
+            "status": "caller_supplied",
+            "source": "caller_supplied",
+            "origin": "caller_supplied",
+            "quality": "U",
+            "confidence": None,
+            "is_live": False,
+            "is_market_quote": False,
+            "is_default_constant": False,
+            "is_verified_fx": False,
+            "notes": "Caller-supplied USD/IDR — not validated as a live market quote.",
+        }
 
     # 1. Load Data
     if details_dict is None:
@@ -278,20 +295,18 @@ def analyze_stock_dividend(
         risk_factors.append(f"Aggressive payout (DPR {dpr_pct:.1f}%): vulnerable to earnings slump")
     elif dpr_pct > 60.0:
         trap_score += 8.0
-
-    # Dimension 3: Smart Money Flow Divergence
+    # Dimension 3: Aggregate Foreign Flow Risk
+    # Foreign flow is aggregate market data and does not identify individual brokers or participant types.
     if nff_5d < 0 and runup_20d_pct > 5.0:
         trap_score += 20.0
         risk_factors.append(
-            "Smart Money Divergence: Foreigners net selling into pre-cum price run-up"
+            "Foreign flow divergence: net foreign selling during a price run-up"
         )
     elif nff_20d < 0:
         trap_score += 10.0
         risk_factors.append(
             f"Foreign outflow: Net selling of Rp{abs(nff_20d) / 1e9:.1f}B over {window_days}d"
         )
-    elif nff_20d > 0:
-        trap_score -= 5.0  # Smart money accumulation bonus
 
     # Dimension 4: Technical Euphoria & Overbought
     if rsi_14 >= 75.0 or runup_20d_pct >= 20.0:
@@ -339,7 +354,7 @@ def analyze_stock_dividend(
         verdict = "BUY / ACCUMULATE"
         tactical_action = (
             "Accumulate before Cum Date or on healthy pullbacks. "
-            "High quality compounder with sustainable payout and institutional backing. "
+            "High quality compounder with sustainable payout and company fundamentals. "
             "Ex-Date price drop is historically shallow and quickly recovered."
         )
     else:
@@ -379,7 +394,7 @@ def analyze_stock_dividend(
             "der": round(der, 2),
             "audit_opinion": audit_opinion,
         },
-        "smart_money": {
+        "foreign_flow": {
             "nff_5d_rp": round(nff_5d, 0),
             "nff_20d_rp": round(nff_20d, 0),
             "foreign_share_pct": round(nff_share_pct, 2),
@@ -391,6 +406,8 @@ def analyze_stock_dividend(
         "risk_factors": risk_factors,
         "verdict": verdict,
         "tactical_action": tactical_action,
+        "usd_idr": fx_quote,
+        "fx": fx_quote,
     }
 
 
@@ -474,7 +491,7 @@ def format_dividend_report(analysis: dict[str, Any]) -> str:
     yld = analysis["dividend_yield_pct"]
     dates = analysis["dates"]
     fund = analysis["fundamentals"]
-    sm = analysis["smart_money"]
+    flow = analysis["foreign_flow"]
     trap = analysis["dividend_trap_score"]
     tier = analysis["dividend_trap_tier"]
     verdict = analysis["verdict"]
@@ -517,9 +534,9 @@ def format_dividend_report(analysis: dict[str, Any]) -> str:
         f"║  • PER           : {fund['per']:>7.1f}x       • PBV          : {fund['pbv']:>9.2f}x       ║",
         f"║  • Audit Opinion : {fund['audit_opinion']:<12}                                           ║",
         "╟──────────────────────────────────────────────────────────────────────────────╢",
-        "║  SMART MONEY & TECHNICAL MOMENTUM:                                           ║",
-        f"║  • Foreign Net 5D: Rp{sm['nff_5d_rp'] / 1e9:>8.1f}B     • Foreign Net 20D : Rp{sm['nff_20d_rp'] / 1e9:>8.1f}B     ║",
-        f"║  • 20D Run-up    : {sm['runup_20d_pct']:>8.2f}%      • RSI-14 (Trend)  : {sm['rsi_14']:>9.1f}       ║",
+        "║  FOREIGN FLOW & TECHNICAL MOMENTUM:                                           ║",
+        f"║  • Foreign Net 5D: Rp{flow['nff_5d_rp'] / 1e9:>8.1f}B     • Foreign Net 20D : Rp{flow['nff_20d_rp'] / 1e9:>8.1f}B     ║",
+        f"║  • 20D Run-up    : {flow['runup_20d_pct']:>8.2f}%      • RSI-14 (Trend)  : {flow['rsi_14']:>9.1f}       ║",
         "╟──────────────────────────────────────────────────────────────────────────────╢",
         f"║  DIVIDEND TRAP RISK SCORE: {tier_badge:<50}║",
     ]

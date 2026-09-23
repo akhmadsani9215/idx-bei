@@ -1,0 +1,3094 @@
+{
+  "status": "OK",
+  "version": "V3.2",
+  "methodology": {
+    "ladder_exit": true,
+    "tp_weights": [
+      0.4,
+      0.3,
+      0.3
+    ],
+    "round_trip_cost": 0.002,
+    "cost_note": "2 bps? No: 0.20% total stress assumption, not claimed as actual broker fee.",
+    "daily_ohlc_limitation": true,
+    "intraday_engine": false
+  },
+  "results": {
+    "nextday": {
+      "FOREIGN_SUPPORT": {
+        "n": 14263,
+        "win_rate_pct": 45.853,
+        "expectancy_pct": -0.8099,
+        "median_pnl_pct": -0.2,
+        "profit_factor": 0.7008,
+        "median_mfe_pct": 3.3333,
+        "median_mae_pct": -3.9474,
+        "median_duration": 3.0,
+        "tp1_rate_pct": 51.904,
+        "tp2_rate_pct": 18.278,
+        "tp3_rate_pct": 3.891,
+        "cl1_rate_pct": 29.86,
+        "cl2_rate_pct": 10.236,
+        "cl3_rate_pct": 9.682,
+        "conditions": [
+          {
+            "condition": "UPTREND",
+            "n": 647,
+            "win_rate_pct": 45.131,
+            "expectancy_pct": -0.2652,
+            "profit_factor": 0.871,
+            "median_mfe_pct": 3.0534,
+            "median_mae_pct": -3.4483,
+            "median_days": 3.0
+          },
+          {
+            "condition": "ATR_LT_1P5",
+            "n": 181,
+            "win_rate_pct": 28.729,
+            "expectancy_pct": -0.423,
+            "profit_factor": 0.2392,
+            "median_mfe_pct": 0.4425,
+            "median_mae_pct": -0.7576,
+            "median_days": 2.0
+          },
+          {
+            "condition": "ATR_1P5_3",
+            "n": 1442,
+            "win_rate_pct": 44.868,
+            "expectancy_pct": -0.4611,
+            "profit_factor": 0.5477,
+            "median_mfe_pct": 1.3158,
+            "median_mae_pct": -1.7699,
+            "median_days": 3.0
+          },
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 5315,
+            "win_rate_pct": 46.754,
+            "expectancy_pct": -0.5673,
+            "profit_factor": 0.7572,
+            "median_mfe_pct": 3.1447,
+            "median_mae_pct": -3.6697,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_LOW",
+            "n": 7453,
+            "win_rate_pct": 47.404,
+            "expectancy_pct": -0.7363,
+            "profit_factor": 0.7292,
+            "median_mfe_pct": 3.5461,
+            "median_mae_pct": -4.0201,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_LT_1",
+            "n": 11261,
+            "win_rate_pct": 45.849,
+            "expectancy_pct": -0.7637,
+            "profit_factor": 0.7153,
+            "median_mfe_pct": 3.4091,
+            "median_mae_pct": -3.9683,
+            "median_days": 3.0
+          },
+          {
+            "condition": "DOWNTREND",
+            "n": 6518,
+            "win_rate_pct": 47.33,
+            "expectancy_pct": -0.7946,
+            "profit_factor": 0.7223,
+            "median_mfe_pct": 3.6585,
+            "median_mae_pct": -4.3011,
+            "median_days": 3.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 14263,
+            "win_rate_pct": 45.853,
+            "expectancy_pct": -0.8099,
+            "profit_factor": 0.7008,
+            "median_mfe_pct": 3.3333,
+            "median_mae_pct": -3.9474,
+            "median_days": 3.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 12640,
+            "win_rate_pct": 46.21,
+            "expectancy_pct": -0.8553,
+            "profit_factor": 0.7081,
+            "median_mfe_pct": 3.8234,
+            "median_mae_pct": -4.5045,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_1_5_2",
+            "n": 630,
+            "win_rate_pct": 47.46,
+            "expectancy_pct": -0.865,
+            "profit_factor": 0.686,
+            "median_mfe_pct": 3.197,
+            "median_mae_pct": -3.8711,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 4267,
+            "win_rate_pct": 44.809,
+            "expectancy_pct": -0.9152,
+            "profit_factor": 0.6558,
+            "median_mfe_pct": 3.0534,
+            "median_mae_pct": -3.8462,
+            "median_days": 3.0
+          },
+          {
+            "condition": "SUPPORT_LT_1ATR",
+            "n": 8948,
+            "win_rate_pct": 45.317,
+            "expectancy_pct": -0.954,
+            "profit_factor": 0.6741,
+            "median_mfe_pct": 3.4429,
+            "median_mae_pct": -4.2254,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 2356,
+            "win_rate_pct": 43.421,
+            "expectancy_pct": -0.9626,
+            "profit_factor": 0.6617,
+            "median_mfe_pct": 3.2787,
+            "median_mae_pct": -4.2667,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_1_1_5",
+            "n": 1764,
+            "win_rate_pct": 45.862,
+            "expectancy_pct": -1.004,
+            "profit_factor": 0.6298,
+            "median_mfe_pct": 2.8986,
+            "median_mae_pct": -3.6697,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_2_3",
+            "n": 396,
+            "win_rate_pct": 45.96,
+            "expectancy_pct": -1.0436,
+            "profit_factor": 0.6413,
+            "median_mfe_pct": 3.0189,
+            "median_mae_pct": -4.3107,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_GE_3",
+            "n": 212,
+            "win_rate_pct": 41.038,
+            "expectancy_pct": -1.0539,
+            "profit_factor": 0.6937,
+            "median_mfe_pct": 3.4732,
+            "median_mae_pct": -5.7557,
+            "median_days": 3.0
+          }
+        ]
+      },
+      "FOREIGN": {
+        "n": 38988,
+        "win_rate_pct": 45.006,
+        "expectancy_pct": -0.8859,
+        "median_pnl_pct": -0.4688,
+        "profit_factor": 0.662,
+        "median_mfe_pct": 3.2258,
+        "median_mae_pct": -3.9301,
+        "median_duration": 3.0,
+        "tp1_rate_pct": 53.896,
+        "tp2_rate_pct": 21.776,
+        "tp3_rate_pct": 5.343,
+        "cl1_rate_pct": 32.766,
+        "cl2_rate_pct": 11.521,
+        "cl3_rate_pct": 10.811,
+        "conditions": [
+          {
+            "condition": "ATR_LT_1P5",
+            "n": 668,
+            "win_rate_pct": 37.275,
+            "expectancy_pct": -0.4033,
+            "profit_factor": 0.3467,
+            "median_mfe_pct": 0.629,
+            "median_mae_pct": -0.8824,
+            "median_days": 3.0
+          },
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 10393,
+            "win_rate_pct": 46.166,
+            "expectancy_pct": -0.5939,
+            "profit_factor": 0.7483,
+            "median_mfe_pct": 3.125,
+            "median_mae_pct": -3.7037,
+            "median_days": 3.0
+          },
+          {
+            "condition": "ATR_1P5_3",
+            "n": 4690,
+            "win_rate_pct": 42.303,
+            "expectancy_pct": -0.6459,
+            "profit_factor": 0.446,
+            "median_mfe_pct": 1.2869,
+            "median_mae_pct": -1.865,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_LT_1",
+            "n": 26541,
+            "win_rate_pct": 45.756,
+            "expectancy_pct": -0.7206,
+            "profit_factor": 0.7125,
+            "median_mfe_pct": 3.1746,
+            "median_mae_pct": -3.7671,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_LOW",
+            "n": 16641,
+            "win_rate_pct": 46.674,
+            "expectancy_pct": -0.7668,
+            "profit_factor": 0.7061,
+            "median_mfe_pct": 3.3613,
+            "median_mae_pct": -3.9301,
+            "median_days": 3.0
+          },
+          {
+            "condition": "DOWNTREND",
+            "n": 9155,
+            "win_rate_pct": 47.209,
+            "expectancy_pct": -0.8264,
+            "profit_factor": 0.7057,
+            "median_mfe_pct": 3.5714,
+            "median_mae_pct": -4.1667,
+            "median_days": 3.0
+          },
+          {
+            "condition": "UPTREND",
+            "n": 11098,
+            "win_rate_pct": 44.449,
+            "expectancy_pct": -0.835,
+            "profit_factor": 0.6702,
+            "median_mfe_pct": 3.2787,
+            "median_mae_pct": -3.9548,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_1_1_5",
+            "n": 6107,
+            "win_rate_pct": 45.98,
+            "expectancy_pct": -0.852,
+            "profit_factor": 0.6529,
+            "median_mfe_pct": 3.0303,
+            "median_mae_pct": -3.662,
+            "median_days": 3.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 38988,
+            "win_rate_pct": 45.006,
+            "expectancy_pct": -0.8859,
+            "profit_factor": 0.662,
+            "median_mfe_pct": 3.2258,
+            "median_mae_pct": -3.9301,
+            "median_days": 3.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 33630,
+            "win_rate_pct": 45.537,
+            "expectancy_pct": -0.9289,
+            "profit_factor": 0.6756,
+            "median_mfe_pct": 3.8298,
+            "median_mae_pct": -4.5212,
+            "median_days": 3.0
+          },
+          {
+            "condition": "SUPPORT_LT_1ATR",
+            "n": 8948,
+            "win_rate_pct": 45.317,
+            "expectancy_pct": -0.954,
+            "profit_factor": 0.6741,
+            "median_mfe_pct": 3.4429,
+            "median_mae_pct": -4.2254,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 11944,
+            "win_rate_pct": 43.897,
+            "expectancy_pct": -0.976,
+            "profit_factor": 0.6179,
+            "median_mfe_pct": 2.9412,
+            "median_mae_pct": -3.8418,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 9867,
+            "win_rate_pct": 43.438,
+            "expectancy_pct": -1.0337,
+            "profit_factor": 0.6153,
+            "median_mfe_pct": 3.3333,
+            "median_mae_pct": -4.0956,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_1_5_2",
+            "n": 2546,
+            "win_rate_pct": 44.501,
+            "expectancy_pct": -1.1492,
+            "profit_factor": 0.5815,
+            "median_mfe_pct": 3.2609,
+            "median_mae_pct": -4.1609,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_2_3",
+            "n": 2013,
+            "win_rate_pct": 40.984,
+            "expectancy_pct": -1.3773,
+            "profit_factor": 0.5524,
+            "median_mfe_pct": 3.7879,
+            "median_mae_pct": -4.9808,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_GE_3",
+            "n": 1781,
+            "win_rate_pct": 35.766,
+            "expectancy_pct": -2.533,
+            "profit_factor": 0.3952,
+            "median_mfe_pct": 4.8387,
+            "median_mae_pct": -6.5217,
+            "median_days": 2.0
+          }
+        ]
+      },
+      "MOMENTUM_FOREIGN": {
+        "n": 3230,
+        "win_rate_pct": 39.536,
+        "expectancy_pct": -1.8213,
+        "median_pnl_pct": -1.4933,
+        "profit_factor": 0.4644,
+        "median_mfe_pct": 4.1764,
+        "median_mae_pct": -5.2239,
+        "median_duration": 2.0,
+        "tp1_rate_pct": 60.619,
+        "tp2_rate_pct": 30.341,
+        "tp3_rate_pct": 10.248,
+        "cl1_rate_pct": 41.95,
+        "cl2_rate_pct": 17.183,
+        "cl3_rate_pct": 20.093,
+        "conditions": [
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 363,
+            "win_rate_pct": 43.802,
+            "expectancy_pct": -0.7571,
+            "profit_factor": 0.73,
+            "median_mfe_pct": 3.9683,
+            "median_mae_pct": -4.878,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_1_1_5",
+            "n": 849,
+            "win_rate_pct": 44.052,
+            "expectancy_pct": -0.8892,
+            "profit_factor": 0.6637,
+            "median_mfe_pct": 3.5088,
+            "median_mae_pct": -4.4271,
+            "median_days": 3.0
+          },
+          {
+            "condition": "DOWNTREND",
+            "n": 293,
+            "win_rate_pct": 48.123,
+            "expectancy_pct": -1.0038,
+            "profit_factor": 0.7016,
+            "median_mfe_pct": 4.5752,
+            "median_mae_pct": -5.9406,
+            "median_days": 3.0
+          },
+          {
+            "condition": "ATR_1P5_3",
+            "n": 400,
+            "win_rate_pct": 32.75,
+            "expectancy_pct": -1.1861,
+            "profit_factor": 0.2625,
+            "median_mfe_pct": 1.4472,
+            "median_mae_pct": -2.5998,
+            "median_days": 2.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 310,
+            "win_rate_pct": 41.29,
+            "expectancy_pct": -1.2716,
+            "profit_factor": 0.5538,
+            "median_mfe_pct": 3.3223,
+            "median_mae_pct": -4.8074,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_1_5_2",
+            "n": 831,
+            "win_rate_pct": 41.877,
+            "expectancy_pct": -1.4126,
+            "profit_factor": 0.535,
+            "median_mfe_pct": 3.5714,
+            "median_mae_pct": -4.6512,
+            "median_days": 2.0
+          },
+          {
+            "condition": "RVOL_2_3",
+            "n": 772,
+            "win_rate_pct": 39.119,
+            "expectancy_pct": -1.6237,
+            "profit_factor": 0.4915,
+            "median_mfe_pct": 4.3478,
+            "median_mae_pct": -5.074,
+            "median_days": 2.0
+          },
+          {
+            "condition": "UPTREND",
+            "n": 1387,
+            "win_rate_pct": 41.384,
+            "expectancy_pct": -1.6713,
+            "profit_factor": 0.4941,
+            "median_mfe_pct": 4.375,
+            "median_mae_pct": -5.2632,
+            "median_days": 2.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 3230,
+            "win_rate_pct": 39.536,
+            "expectancy_pct": -1.8213,
+            "profit_factor": 0.4644,
+            "median_mfe_pct": 4.1764,
+            "median_mae_pct": -5.2239,
+            "median_days": 2.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 2920,
+            "win_rate_pct": 39.349,
+            "expectancy_pct": -1.8797,
+            "profit_factor": 0.4566,
+            "median_mfe_pct": 4.2503,
+            "median_mae_pct": -5.2801,
+            "median_days": 2.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 2797,
+            "win_rate_pct": 40.686,
+            "expectancy_pct": -1.9253,
+            "profit_factor": 0.4777,
+            "median_mfe_pct": 5.0,
+            "median_mae_pct": -5.9633,
+            "median_days": 2.0
+          },
+          {
+            "condition": "RVOL_GE_3",
+            "n": 778,
+            "win_rate_pct": 32.519,
+            "expectancy_pct": -3.4711,
+            "profit_factor": 0.2799,
+            "median_mfe_pct": 5.7143,
+            "median_mae_pct": -7.395,
+            "median_days": 2.0
+          }
+        ]
+      },
+      "MOMENTUM_RVOL2": {
+        "n": 2764,
+        "win_rate_pct": 34.588,
+        "expectancy_pct": -2.8859,
+        "median_pnl_pct": -2.6475,
+        "profit_factor": 0.3391,
+        "median_mfe_pct": 5.0988,
+        "median_mae_pct": -6.5901,
+        "median_duration": 2.0,
+        "tp1_rate_pct": 59.298,
+        "tp2_rate_pct": 31.983,
+        "tp3_rate_pct": 12.337,
+        "cl1_rate_pct": 41.064,
+        "cl2_rate_pct": 17.149,
+        "cl3_rate_pct": 25.832,
+        "conditions": [
+          {
+            "condition": "ATR_1P5_3",
+            "n": 297,
+            "win_rate_pct": 34.343,
+            "expectancy_pct": -1.2319,
+            "profit_factor": 0.2733,
+            "median_mfe_pct": 1.6484,
+            "median_mae_pct": -2.8249,
+            "median_days": 2.0
+          },
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 209,
+            "win_rate_pct": 40.67,
+            "expectancy_pct": -1.2845,
+            "profit_factor": 0.6412,
+            "median_mfe_pct": 4.0346,
+            "median_mae_pct": -5.3333,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_2_3",
+            "n": 1273,
+            "win_rate_pct": 40.456,
+            "expectancy_pct": -1.5564,
+            "profit_factor": 0.515,
+            "median_mfe_pct": 4.3478,
+            "median_mae_pct": -5.0228,
+            "median_days": 2.0
+          },
+          {
+            "condition": "DOWNTREND",
+            "n": 175,
+            "win_rate_pct": 39.429,
+            "expectancy_pct": -1.9708,
+            "profit_factor": 0.4985,
+            "median_mfe_pct": 4.6154,
+            "median_mae_pct": -6.3492,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 262,
+            "win_rate_pct": 35.496,
+            "expectancy_pct": -2.356,
+            "profit_factor": 0.3548,
+            "median_mfe_pct": 3.3413,
+            "median_mae_pct": -5.8824,
+            "median_days": 2.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 1550,
+            "win_rate_pct": 35.806,
+            "expectancy_pct": -2.551,
+            "profit_factor": 0.3638,
+            "median_mfe_pct": 4.8627,
+            "median_mae_pct": -6.25,
+            "median_days": 2.0
+          },
+          {
+            "condition": "UPTREND",
+            "n": 1160,
+            "win_rate_pct": 35.431,
+            "expectancy_pct": -2.8307,
+            "profit_factor": 0.3525,
+            "median_mfe_pct": 5.6279,
+            "median_mae_pct": -6.8966,
+            "median_days": 2.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 2502,
+            "win_rate_pct": 34.492,
+            "expectancy_pct": -2.9414,
+            "profit_factor": 0.3377,
+            "median_mfe_pct": 5.2771,
+            "median_mae_pct": -6.6282,
+            "median_days": 2.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 2441,
+            "win_rate_pct": 34.781,
+            "expectancy_pct": -3.1067,
+            "profit_factor": 0.3426,
+            "median_mfe_pct": 6.0606,
+            "median_mae_pct": -7.4627,
+            "median_days": 2.0
+          },
+          {
+            "condition": "FOREIGN_NEG",
+            "n": 1214,
+            "win_rate_pct": 33.031,
+            "expectancy_pct": -3.3135,
+            "profit_factor": 0.3128,
+            "median_mfe_pct": 5.2786,
+            "median_mae_pct": -7.1429,
+            "median_days": 2.0
+          },
+          {
+            "condition": "RVOL_GE_3",
+            "n": 1491,
+            "win_rate_pct": 29.577,
+            "expectancy_pct": -4.021,
+            "profit_factor": 0.2491,
+            "median_mfe_pct": 5.8511,
+            "median_mae_pct": -8.0925,
+            "median_days": 2.0
+          }
+        ]
+      },
+      "ABSORPTION_FOREIGN": {
+        "n": 570,
+        "win_rate_pct": 41.754,
+        "expectancy_pct": -1.0828,
+        "median_pnl_pct": -0.6879,
+        "profit_factor": 0.462,
+        "median_mfe_pct": 1.9231,
+        "median_mae_pct": -2.8037,
+        "median_duration": 3.0,
+        "tp1_rate_pct": 53.86,
+        "tp2_rate_pct": 21.404,
+        "tp3_rate_pct": 6.14,
+        "cl1_rate_pct": 41.228,
+        "cl2_rate_pct": 16.491,
+        "cl3_rate_pct": 17.719,
+        "conditions": [
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 112,
+            "win_rate_pct": 49.107,
+            "expectancy_pct": 0.0829,
+            "profit_factor": 1.0769,
+            "median_mfe_pct": 1.9381,
+            "median_mae_pct": -2.3613,
+            "median_days": 3.0
+          },
+          {
+            "condition": "ATR_1P5_3",
+            "n": 178,
+            "win_rate_pct": 40.449,
+            "expectancy_pct": -0.6696,
+            "profit_factor": 0.4169,
+            "median_mfe_pct": 1.1133,
+            "median_mae_pct": -1.9775,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 215,
+            "win_rate_pct": 43.256,
+            "expectancy_pct": -1.0048,
+            "profit_factor": 0.5106,
+            "median_mfe_pct": 2.139,
+            "median_mae_pct": -2.8571,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_1_1_5",
+            "n": 283,
+            "win_rate_pct": 42.756,
+            "expectancy_pct": -1.0417,
+            "profit_factor": 0.4915,
+            "median_mfe_pct": 1.9608,
+            "median_mae_pct": -2.5126,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_1_5_2",
+            "n": 178,
+            "win_rate_pct": 44.382,
+            "expectancy_pct": -1.0662,
+            "profit_factor": 0.4279,
+            "median_mfe_pct": 2.0105,
+            "median_mae_pct": -2.623,
+            "median_days": 3.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 570,
+            "win_rate_pct": 41.754,
+            "expectancy_pct": -1.0828,
+            "profit_factor": 0.462,
+            "median_mfe_pct": 1.9231,
+            "median_mae_pct": -2.8037,
+            "median_days": 3.0
+          },
+          {
+            "condition": "DOWNTREND",
+            "n": 119,
+            "win_rate_pct": 47.059,
+            "expectancy_pct": -1.0918,
+            "profit_factor": 0.5073,
+            "median_mfe_pct": 2.3697,
+            "median_mae_pct": -3.1746,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 355,
+            "win_rate_pct": 40.845,
+            "expectancy_pct": -1.1301,
+            "profit_factor": 0.4317,
+            "median_mfe_pct": 1.8868,
+            "median_mae_pct": -2.7778,
+            "median_days": 3.0
+          },
+          {
+            "condition": "UPTREND",
+            "n": 180,
+            "win_rate_pct": 40.556,
+            "expectancy_pct": -1.2742,
+            "profit_factor": 0.3964,
+            "median_mfe_pct": 1.9231,
+            "median_mae_pct": -2.8186,
+            "median_days": 3.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 347,
+            "win_rate_pct": 43.516,
+            "expectancy_pct": -1.3601,
+            "profit_factor": 0.4796,
+            "median_mfe_pct": 2.8571,
+            "median_mae_pct": -4.1667,
+            "median_days": 3.0
+          },
+          {
+            "condition": "SUPPORT_LT_1ATR",
+            "n": 106,
+            "win_rate_pct": 38.679,
+            "expectancy_pct": -1.9705,
+            "profit_factor": 0.3261,
+            "median_mfe_pct": 1.9546,
+            "median_mae_pct": -3.5099,
+            "median_days": 3.0
+          }
+        ]
+      },
+      "ABSORPTION_RVOL2": {
+        "n": 249,
+        "win_rate_pct": 40.964,
+        "expectancy_pct": -1.0925,
+        "median_pnl_pct": -0.8667,
+        "profit_factor": 0.4715,
+        "median_mfe_pct": 1.9608,
+        "median_mae_pct": -3.0,
+        "median_duration": 3.0,
+        "tp1_rate_pct": 53.012,
+        "tp2_rate_pct": 22.088,
+        "tp3_rate_pct": 6.024,
+        "cl1_rate_pct": 35.743,
+        "cl2_rate_pct": 15.663,
+        "cl3_rate_pct": 21.687,
+        "conditions": [
+          {
+            "condition": "FOREIGN_NEG",
+            "n": 140,
+            "win_rate_pct": 45.714,
+            "expectancy_pct": -0.9959,
+            "profit_factor": 0.5002,
+            "median_mfe_pct": 2.4081,
+            "median_mae_pct": -2.6436,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 155,
+            "win_rate_pct": 40.0,
+            "expectancy_pct": -1.1307,
+            "profit_factor": 0.4547,
+            "median_mfe_pct": 1.8182,
+            "median_mae_pct": -2.8986,
+            "median_days": 3.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 109,
+            "win_rate_pct": 34.862,
+            "expectancy_pct": -1.2167,
+            "profit_factor": 0.4376,
+            "median_mfe_pct": 1.6667,
+            "median_mae_pct": -3.9216,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_2_3",
+            "n": 191,
+            "win_rate_pct": 38.22,
+            "expectancy_pct": -1.3128,
+            "profit_factor": 0.4115,
+            "median_mfe_pct": 1.9048,
+            "median_mae_pct": -3.0,
+            "median_days": 3.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 136,
+            "win_rate_pct": 42.647,
+            "expectancy_pct": -1.3989,
+            "profit_factor": 0.5003,
+            "median_mfe_pct": 2.8952,
+            "median_mae_pct": -4.5977,
+            "median_days": 3.0
+          }
+        ]
+      },
+      "REVERSAL_FOREIGN": {
+        "n": 1605,
+        "win_rate_pct": 44.174,
+        "expectancy_pct": -1.0546,
+        "median_pnl_pct": -0.7479,
+        "profit_factor": 0.6171,
+        "median_mfe_pct": 3.3613,
+        "median_mae_pct": -4.2857,
+        "median_duration": 3.0,
+        "tp1_rate_pct": 52.897,
+        "tp2_rate_pct": 18.442,
+        "tp3_rate_pct": 5.234,
+        "cl1_rate_pct": 32.897,
+        "cl2_rate_pct": 12.025,
+        "cl3_rate_pct": 12.461,
+        "conditions": [
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 375,
+            "win_rate_pct": 47.733,
+            "expectancy_pct": -0.4579,
+            "profit_factor": 0.796,
+            "median_mfe_pct": 3.1447,
+            "median_mae_pct": -3.6199,
+            "median_days": 3.0
+          },
+          {
+            "condition": "UPTREND",
+            "n": 418,
+            "win_rate_pct": 47.129,
+            "expectancy_pct": -0.4938,
+            "profit_factor": 0.7929,
+            "median_mfe_pct": 3.4724,
+            "median_mae_pct": -4.1034,
+            "median_days": 3.0
+          },
+          {
+            "condition": "ATR_1P5_3",
+            "n": 168,
+            "win_rate_pct": 38.69,
+            "expectancy_pct": -0.6813,
+            "profit_factor": 0.4031,
+            "median_mfe_pct": 1.173,
+            "median_mae_pct": -2.0772,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_LT_1",
+            "n": 1183,
+            "win_rate_pct": 45.055,
+            "expectancy_pct": -0.8424,
+            "profit_factor": 0.6866,
+            "median_mfe_pct": 3.5714,
+            "median_mae_pct": -4.321,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 574,
+            "win_rate_pct": 43.728,
+            "expectancy_pct": -1.0129,
+            "profit_factor": 0.6199,
+            "median_mfe_pct": 3.4924,
+            "median_mae_pct": -4.2512,
+            "median_days": 3.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 1605,
+            "win_rate_pct": 44.174,
+            "expectancy_pct": -1.0546,
+            "profit_factor": 0.6171,
+            "median_mfe_pct": 3.3613,
+            "median_mae_pct": -4.2857,
+            "median_days": 3.0
+          },
+          {
+            "condition": "DOWNTREND",
+            "n": 453,
+            "win_rate_pct": 46.799,
+            "expectancy_pct": -1.0556,
+            "profit_factor": 0.6482,
+            "median_mfe_pct": 4.0404,
+            "median_mae_pct": -4.9645,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 1031,
+            "win_rate_pct": 44.423,
+            "expectancy_pct": -1.0778,
+            "profit_factor": 0.6157,
+            "median_mfe_pct": 3.2086,
+            "median_mae_pct": -4.3011,
+            "median_days": 3.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 1417,
+            "win_rate_pct": 45.095,
+            "expectancy_pct": -1.1014,
+            "profit_factor": 0.6292,
+            "median_mfe_pct": 3.8095,
+            "median_mae_pct": -4.902,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_1_1_5",
+            "n": 266,
+            "win_rate_pct": 42.857,
+            "expectancy_pct": -1.7174,
+            "profit_factor": 0.4383,
+            "median_mfe_pct": 2.8778,
+            "median_mae_pct": -3.8648,
+            "median_days": 3.0
+          },
+          {
+            "condition": "SUPPORT_LT_1ATR",
+            "n": 544,
+            "win_rate_pct": 40.625,
+            "expectancy_pct": -1.9408,
+            "profit_factor": 0.4686,
+            "median_mfe_pct": 3.6188,
+            "median_mae_pct": -5.7424,
+            "median_days": 3.0
+          }
+        ]
+      },
+      "REVERSAL_RVOL2": {
+        "n": 164,
+        "win_rate_pct": 44.512,
+        "expectancy_pct": -1.5999,
+        "median_pnl_pct": -0.4901,
+        "profit_factor": 0.4457,
+        "median_mfe_pct": 3.1126,
+        "median_mae_pct": -4.5977,
+        "median_duration": 3.0,
+        "tp1_rate_pct": 58.537,
+        "tp2_rate_pct": 20.732,
+        "tp3_rate_pct": 4.878,
+        "cl1_rate_pct": 35.976,
+        "cl2_rate_pct": 11.585,
+        "cl3_rate_pct": 23.171,
+        "conditions": [
+          {
+            "condition": "ATR_GE_3",
+            "n": 130,
+            "win_rate_pct": 44.615,
+            "expectancy_pct": -1.9308,
+            "profit_factor": 0.4356,
+            "median_mfe_pct": 3.534,
+            "median_mae_pct": -5.6057,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_2_3",
+            "n": 127,
+            "win_rate_pct": 40.157,
+            "expectancy_pct": -2.1895,
+            "profit_factor": 0.3263,
+            "median_mfe_pct": 2.7027,
+            "median_mae_pct": -4.918,
+            "median_days": 3.0
+          }
+        ]
+      },
+      "PULLBACK": {
+        "n": 389,
+        "win_rate_pct": 42.931,
+        "expectancy_pct": -0.4457,
+        "median_pnl_pct": -0.7051,
+        "profit_factor": 0.7781,
+        "median_mfe_pct": 2.6316,
+        "median_mae_pct": -3.4188,
+        "median_duration": 3.0,
+        "tp1_rate_pct": 46.53,
+        "tp2_rate_pct": 17.995,
+        "tp3_rate_pct": 4.884,
+        "cl1_rate_pct": 27.506,
+        "cl2_rate_pct": 7.969,
+        "cl3_rate_pct": 3.599,
+        "conditions": [
+          {
+            "condition": "UPTREND",
+            "n": 190,
+            "win_rate_pct": 47.895,
+            "expectancy_pct": 0.0232,
+            "profit_factor": 1.012,
+            "median_mfe_pct": 3.1133,
+            "median_mae_pct": -3.5929,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_LT_1",
+            "n": 321,
+            "win_rate_pct": 45.171,
+            "expectancy_pct": -0.2881,
+            "profit_factor": 0.8523,
+            "median_mfe_pct": 2.8846,
+            "median_mae_pct": -3.5714,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 152,
+            "win_rate_pct": 44.737,
+            "expectancy_pct": -0.3043,
+            "profit_factor": 0.8478,
+            "median_mfe_pct": 2.2642,
+            "median_mae_pct": -3.3876,
+            "median_days": 3.0
+          },
+          {
+            "condition": "FOREIGN_NEG",
+            "n": 187,
+            "win_rate_pct": 44.385,
+            "expectancy_pct": -0.3107,
+            "profit_factor": 0.8349,
+            "median_mfe_pct": 2.6316,
+            "median_mae_pct": -3.3898,
+            "median_days": 3.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 338,
+            "win_rate_pct": 46.154,
+            "expectancy_pct": -0.3636,
+            "profit_factor": 0.8287,
+            "median_mfe_pct": 3.108,
+            "median_mae_pct": -3.7665,
+            "median_days": 3.0
+          },
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 335,
+            "win_rate_pct": 43.284,
+            "expectancy_pct": -0.4837,
+            "profit_factor": 0.7605,
+            "median_mfe_pct": 2.6786,
+            "median_mae_pct": -3.3898,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 237,
+            "win_rate_pct": 41.772,
+            "expectancy_pct": -0.5364,
+            "profit_factor": 0.7337,
+            "median_mfe_pct": 2.6786,
+            "median_mae_pct": -3.4884,
+            "median_days": 3.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 202,
+            "win_rate_pct": 41.584,
+            "expectancy_pct": -0.5707,
+            "profit_factor": 0.7316,
+            "median_mfe_pct": 2.5658,
+            "median_mae_pct": -3.4683,
+            "median_days": 3.0
+          }
+        ]
+      },
+      "MOMENTUM": {
+        "n": 5578,
+        "win_rate_pct": 38.741,
+        "expectancy_pct": -2.0303,
+        "median_pnl_pct": -1.6815,
+        "profit_factor": 0.437,
+        "median_mfe_pct": 4.1502,
+        "median_mae_pct": -5.3079,
+        "median_duration": 2.0,
+        "tp1_rate_pct": 59.107,
+        "tp2_rate_pct": 29.616,
+        "tp3_rate_pct": 9.609,
+        "cl1_rate_pct": 41.395,
+        "cl2_rate_pct": 16.619,
+        "cl3_rate_pct": 20.814,
+        "conditions": [
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 743,
+            "win_rate_pct": 43.338,
+            "expectancy_pct": -0.8046,
+            "profit_factor": 0.7087,
+            "median_mfe_pct": 3.6437,
+            "median_mae_pct": -4.3478,
+            "median_days": 3.0
+          },
+          {
+            "condition": "DOWNTREND",
+            "n": 608,
+            "win_rate_pct": 45.888,
+            "expectancy_pct": -0.8923,
+            "profit_factor": 0.7003,
+            "median_mfe_pct": 4.0816,
+            "median_mae_pct": -5.1724,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_1_1_5",
+            "n": 1427,
+            "win_rate_pct": 43.588,
+            "expectancy_pct": -1.0008,
+            "profit_factor": 0.6279,
+            "median_mfe_pct": 3.4483,
+            "median_mae_pct": -4.2424,
+            "median_days": 3.0
+          },
+          {
+            "condition": "ATR_1P5_3",
+            "n": 735,
+            "win_rate_pct": 35.646,
+            "expectancy_pct": -1.0318,
+            "profit_factor": 0.3143,
+            "median_mfe_pct": 1.4815,
+            "median_mae_pct": -2.4793,
+            "median_days": 2.0
+          },
+          {
+            "condition": "RVOL_1_5_2",
+            "n": 1387,
+            "win_rate_pct": 42.033,
+            "expectancy_pct": -1.3843,
+            "profit_factor": 0.5436,
+            "median_mfe_pct": 3.4826,
+            "median_mae_pct": -4.6083,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 550,
+            "win_rate_pct": 39.818,
+            "expectancy_pct": -1.5138,
+            "profit_factor": 0.4998,
+            "median_mfe_pct": 3.094,
+            "median_mae_pct": -4.9426,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_2_3",
+            "n": 1273,
+            "win_rate_pct": 40.456,
+            "expectancy_pct": -1.5564,
+            "profit_factor": 0.515,
+            "median_mfe_pct": 4.3478,
+            "median_mae_pct": -5.0228,
+            "median_days": 2.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 3230,
+            "win_rate_pct": 39.536,
+            "expectancy_pct": -1.8213,
+            "profit_factor": 0.4644,
+            "median_mfe_pct": 4.1764,
+            "median_mae_pct": -5.2239,
+            "median_days": 2.0
+          },
+          {
+            "condition": "SUPPORT_LT_1ATR",
+            "n": 212,
+            "win_rate_pct": 37.264,
+            "expectancy_pct": -1.9368,
+            "profit_factor": 0.5032,
+            "median_mfe_pct": 3.302,
+            "median_mae_pct": -5.625,
+            "median_days": 3.0
+          },
+          {
+            "condition": "UPTREND",
+            "n": 2186,
+            "win_rate_pct": 39.478,
+            "expectancy_pct": -2.0729,
+            "profit_factor": 0.4374,
+            "median_mfe_pct": 4.4776,
+            "median_mae_pct": -5.5712,
+            "median_days": 2.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 5028,
+            "win_rate_pct": 38.624,
+            "expectancy_pct": -2.0868,
+            "profit_factor": 0.4313,
+            "median_mfe_pct": 4.2645,
+            "median_mae_pct": -5.364,
+            "median_days": 2.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 4789,
+            "win_rate_pct": 39.424,
+            "expectancy_pct": -2.1965,
+            "profit_factor": 0.4449,
+            "median_mfe_pct": 5.0279,
+            "median_mae_pct": -6.2016,
+            "median_days": 2.0
+          },
+          {
+            "condition": "FOREIGN_NEG",
+            "n": 2348,
+            "win_rate_pct": 37.649,
+            "expectancy_pct": -2.3177,
+            "profit_factor": 0.4039,
+            "median_mfe_pct": 4.104,
+            "median_mae_pct": -5.4795,
+            "median_days": 2.0
+          },
+          {
+            "condition": "RVOL_GE_3",
+            "n": 1491,
+            "win_rate_pct": 29.577,
+            "expectancy_pct": -4.021,
+            "profit_factor": 0.2491,
+            "median_mfe_pct": 5.8511,
+            "median_mae_pct": -8.0925,
+            "median_days": 2.0
+          }
+        ]
+      },
+      "ABSORPTION": {
+        "n": 1150,
+        "win_rate_pct": 42.87,
+        "expectancy_pct": -0.9056,
+        "median_pnl_pct": -0.5608,
+        "profit_factor": 0.5227,
+        "median_mfe_pct": 1.9816,
+        "median_mae_pct": -2.6702,
+        "median_duration": 3.0,
+        "tp1_rate_pct": 54.957,
+        "tp2_rate_pct": 23.043,
+        "tp3_rate_pct": 6.609,
+        "cl1_rate_pct": 39.565,
+        "cl2_rate_pct": 14.609,
+        "cl3_rate_pct": 16.522,
+        "conditions": [
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 241,
+            "win_rate_pct": 48.963,
+            "expectancy_pct": -0.0666,
+            "profit_factor": 0.9458,
+            "median_mfe_pct": 2.0683,
+            "median_mae_pct": -2.2857,
+            "median_days": 3.0
+          },
+          {
+            "condition": "ATR_1P5_3",
+            "n": 384,
+            "win_rate_pct": 41.927,
+            "expectancy_pct": -0.5846,
+            "profit_factor": 0.4828,
+            "median_mfe_pct": 1.2214,
+            "median_mae_pct": -1.9048,
+            "median_days": 3.0
+          },
+          {
+            "condition": "FOREIGN_NEG",
+            "n": 580,
+            "win_rate_pct": 43.966,
+            "expectancy_pct": -0.7315,
+            "profit_factor": 0.5901,
+            "median_mfe_pct": 2.1068,
+            "median_mae_pct": -2.5262,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_1_1_5",
+            "n": 542,
+            "win_rate_pct": 42.066,
+            "expectancy_pct": -0.8424,
+            "profit_factor": 0.5528,
+            "median_mfe_pct": 1.9355,
+            "median_mae_pct": -2.5523,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 436,
+            "win_rate_pct": 44.495,
+            "expectancy_pct": -0.8663,
+            "profit_factor": 0.5604,
+            "median_mfe_pct": 2.3203,
+            "median_mae_pct": -2.7524,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_1_5_2",
+            "n": 359,
+            "win_rate_pct": 45.404,
+            "expectancy_pct": -0.8714,
+            "profit_factor": 0.5161,
+            "median_mfe_pct": 2.0548,
+            "median_mae_pct": -2.459,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 714,
+            "win_rate_pct": 41.877,
+            "expectancy_pct": -0.9296,
+            "profit_factor": 0.4983,
+            "median_mfe_pct": 1.9017,
+            "median_mae_pct": -2.6132,
+            "median_days": 3.0
+          },
+          {
+            "condition": "UPTREND",
+            "n": 304,
+            "win_rate_pct": 45.724,
+            "expectancy_pct": -0.9435,
+            "profit_factor": 0.5117,
+            "median_mfe_pct": 2.0467,
+            "median_mae_pct": -2.7119,
+            "median_days": 3.0
+          },
+          {
+            "condition": "DOWNTREND",
+            "n": 305,
+            "win_rate_pct": 45.574,
+            "expectancy_pct": -1.0227,
+            "profit_factor": 0.5248,
+            "median_mfe_pct": 2.2727,
+            "median_mae_pct": -2.7344,
+            "median_days": 3.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 570,
+            "win_rate_pct": 41.754,
+            "expectancy_pct": -1.0828,
+            "profit_factor": 0.462,
+            "median_mfe_pct": 1.9231,
+            "median_mae_pct": -2.8037,
+            "median_days": 3.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 681,
+            "win_rate_pct": 44.64,
+            "expectancy_pct": -1.1331,
+            "profit_factor": 0.5419,
+            "median_mfe_pct": 2.8571,
+            "median_mae_pct": -3.937,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_2_3",
+            "n": 191,
+            "win_rate_pct": 38.22,
+            "expectancy_pct": -1.3128,
+            "profit_factor": 0.4115,
+            "median_mfe_pct": 1.9048,
+            "median_mae_pct": -3.0,
+            "median_days": 3.0
+          },
+          {
+            "condition": "SUPPORT_LT_1ATR",
+            "n": 290,
+            "win_rate_pct": 41.034,
+            "expectancy_pct": -1.4511,
+            "profit_factor": 0.3923,
+            "median_mfe_pct": 2.0816,
+            "median_mae_pct": -2.7618,
+            "median_days": 3.0
+          }
+        ]
+      },
+      "REVERSAL": {
+        "n": 3201,
+        "win_rate_pct": 43.768,
+        "expectancy_pct": -1.134,
+        "median_pnl_pct": -0.7435,
+        "profit_factor": 0.5791,
+        "median_mfe_pct": 3.0612,
+        "median_mae_pct": -4.0323,
+        "median_duration": 3.0,
+        "tp1_rate_pct": 51.359,
+        "tp2_rate_pct": 16.963,
+        "tp3_rate_pct": 4.405,
+        "cl1_rate_pct": 32.865,
+        "cl2_rate_pct": 11.184,
+        "cl3_rate_pct": 12.621,
+        "conditions": [
+          {
+            "condition": "ATR_1P5_3",
+            "n": 387,
+            "win_rate_pct": 39.276,
+            "expectancy_pct": -0.6946,
+            "profit_factor": 0.4018,
+            "median_mfe_pct": 1.2346,
+            "median_mae_pct": -1.938,
+            "median_days": 3.0
+          },
+          {
+            "condition": "UPTREND",
+            "n": 709,
+            "win_rate_pct": 46.121,
+            "expectancy_pct": -0.6979,
+            "profit_factor": 0.7137,
+            "median_mfe_pct": 3.3333,
+            "median_mae_pct": -4.0,
+            "median_days": 3.0
+          },
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 767,
+            "win_rate_pct": 46.023,
+            "expectancy_pct": -0.8139,
+            "profit_factor": 0.6625,
+            "median_mfe_pct": 2.7523,
+            "median_mae_pct": -3.6364,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_LT_1",
+            "n": 2286,
+            "win_rate_pct": 44.576,
+            "expectancy_pct": -0.9403,
+            "profit_factor": 0.6439,
+            "median_mfe_pct": 3.2,
+            "median_mae_pct": -4.0996,
+            "median_days": 3.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 1605,
+            "win_rate_pct": 44.174,
+            "expectancy_pct": -1.0546,
+            "profit_factor": 0.6171,
+            "median_mfe_pct": 3.3613,
+            "median_mae_pct": -4.2857,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 1103,
+            "win_rate_pct": 43.79,
+            "expectancy_pct": -1.1014,
+            "profit_factor": 0.5878,
+            "median_mfe_pct": 3.1847,
+            "median_mae_pct": -4.1667,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 2098,
+            "win_rate_pct": 43.756,
+            "expectancy_pct": -1.1511,
+            "profit_factor": 0.5746,
+            "median_mfe_pct": 2.9925,
+            "median_mae_pct": -4.0,
+            "median_days": 3.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 2774,
+            "win_rate_pct": 44.701,
+            "expectancy_pct": -1.1988,
+            "profit_factor": 0.5912,
+            "median_mfe_pct": 3.4924,
+            "median_mae_pct": -4.6875,
+            "median_days": 3.0
+          },
+          {
+            "condition": "FOREIGN_NEG",
+            "n": 1596,
+            "win_rate_pct": 43.358,
+            "expectancy_pct": -1.2138,
+            "profit_factor": 0.5392,
+            "median_mfe_pct": 2.7605,
+            "median_mae_pct": -3.7838,
+            "median_days": 3.0
+          },
+          {
+            "condition": "DOWNTREND",
+            "n": 999,
+            "win_rate_pct": 44.745,
+            "expectancy_pct": -1.2356,
+            "profit_factor": 0.5684,
+            "median_mfe_pct": 3.2258,
+            "median_mae_pct": -4.2553,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_1_5_2",
+            "n": 194,
+            "win_rate_pct": 45.361,
+            "expectancy_pct": -1.2965,
+            "profit_factor": 0.4754,
+            "median_mfe_pct": 2.7307,
+            "median_mae_pct": -3.7037,
+            "median_days": 3.0
+          },
+          {
+            "condition": "SUPPORT_LT_1ATR",
+            "n": 1127,
+            "win_rate_pct": 42.059,
+            "expectancy_pct": -1.68,
+            "profit_factor": 0.4736,
+            "median_mfe_pct": 3.3333,
+            "median_mae_pct": -4.7059,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_1_1_5",
+            "n": 557,
+            "win_rate_pct": 39.677,
+            "expectancy_pct": -1.7347,
+            "profit_factor": 0.4094,
+            "median_mfe_pct": 2.6667,
+            "median_mae_pct": -3.75,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_2_3",
+            "n": 127,
+            "win_rate_pct": 40.157,
+            "expectancy_pct": -2.1895,
+            "profit_factor": 0.3263,
+            "median_mfe_pct": 2.7027,
+            "median_mae_pct": -4.918,
+            "median_days": 3.0
+          }
+        ]
+      }
+    },
+    "swing": {
+      "FOREIGN_SUPPORT": {
+        "n": 13265,
+        "win_rate_pct": 46.197,
+        "expectancy_pct": -0.5337,
+        "median_pnl_pct": -1.3667,
+        "profit_factor": 0.8686,
+        "median_mfe_pct": 6.3291,
+        "median_mae_pct": -6.0606,
+        "median_duration": 5.0,
+        "tp1_rate_pct": 54.271,
+        "tp2_rate_pct": 18.138,
+        "tp3_rate_pct": 3.4,
+        "cl1_rate_pct": 53.125,
+        "cl2_rate_pct": 21.922,
+        "cl3_rate_pct": 13.14,
+        "conditions": [
+          {
+            "condition": "UPTREND",
+            "n": 602,
+            "win_rate_pct": 50.332,
+            "expectancy_pct": 0.2267,
+            "profit_factor": 1.0717,
+            "median_mfe_pct": 7.3922,
+            "median_mae_pct": -5.3571,
+            "median_days": 5.0
+          },
+          {
+            "condition": "DOWNTREND",
+            "n": 6053,
+            "win_rate_pct": 48.687,
+            "expectancy_pct": -0.1408,
+            "profit_factor": 0.9657,
+            "median_mfe_pct": 6.9231,
+            "median_mae_pct": -6.422,
+            "median_days": 5.0
+          },
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 4928,
+            "win_rate_pct": 47.991,
+            "expectancy_pct": -0.2683,
+            "profit_factor": 0.9256,
+            "median_mfe_pct": 6.7227,
+            "median_mae_pct": -5.4929,
+            "median_days": 5.0
+          },
+          {
+            "condition": "CLOSE_LOW",
+            "n": 7030,
+            "win_rate_pct": 47.212,
+            "expectancy_pct": -0.3971,
+            "profit_factor": 0.9018,
+            "median_mfe_pct": 6.5403,
+            "median_mae_pct": -6.1224,
+            "median_days": 5.0
+          },
+          {
+            "condition": "RVOL_LT_1",
+            "n": 10443,
+            "win_rate_pct": 46.443,
+            "expectancy_pct": -0.4447,
+            "profit_factor": 0.8916,
+            "median_mfe_pct": 6.6986,
+            "median_mae_pct": -6.2016,
+            "median_days": 6.0
+          },
+          {
+            "condition": "ATR_LT_1P5",
+            "n": 173,
+            "win_rate_pct": 35.26,
+            "expectancy_pct": -0.4651,
+            "profit_factor": 0.4107,
+            "median_mfe_pct": 0.5917,
+            "median_mae_pct": -0.9975,
+            "median_days": 3.0
+          },
+          {
+            "condition": "ATR_1P5_3",
+            "n": 1382,
+            "win_rate_pct": 43.198,
+            "expectancy_pct": -0.5326,
+            "profit_factor": 0.6515,
+            "median_mfe_pct": 2.3029,
+            "median_mae_pct": -2.5718,
+            "median_days": 4.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 13265,
+            "win_rate_pct": 46.197,
+            "expectancy_pct": -0.5337,
+            "profit_factor": 0.8686,
+            "median_mfe_pct": 6.3291,
+            "median_mae_pct": -6.0606,
+            "median_days": 5.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 11710,
+            "win_rate_pct": 46.712,
+            "expectancy_pct": -0.5349,
+            "profit_factor": 0.8787,
+            "median_mfe_pct": 7.3845,
+            "median_mae_pct": -6.9307,
+            "median_days": 6.0
+          },
+          {
+            "condition": "RVOL_2_3",
+            "n": 371,
+            "win_rate_pct": 46.9,
+            "expectancy_pct": -0.5706,
+            "profit_factor": 0.8525,
+            "median_mfe_pct": 5.1136,
+            "median_mae_pct": -5.9524,
+            "median_days": 4.0
+          },
+          {
+            "condition": "RVOL_1_5_2",
+            "n": 592,
+            "win_rate_pct": 47.128,
+            "expectancy_pct": -0.6072,
+            "profit_factor": 0.8403,
+            "median_mfe_pct": 5.4135,
+            "median_mae_pct": -5.6604,
+            "median_days": 4.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 3928,
+            "win_rate_pct": 45.545,
+            "expectancy_pct": -0.6832,
+            "profit_factor": 0.8301,
+            "median_mfe_pct": 6.0569,
+            "median_mae_pct": -5.8364,
+            "median_days": 5.0
+          },
+          {
+            "condition": "SUPPORT_LT_1ATR",
+            "n": 8337,
+            "win_rate_pct": 45.136,
+            "expectancy_pct": -0.6906,
+            "profit_factor": 0.8406,
+            "median_mfe_pct": 6.1224,
+            "median_mae_pct": -6.5,
+            "median_days": 5.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 2126,
+            "win_rate_pct": 44.167,
+            "expectancy_pct": -0.8522,
+            "profit_factor": 0.8039,
+            "median_mfe_pct": 6.25,
+            "median_mae_pct": -6.5829,
+            "median_days": 5.0
+          },
+          {
+            "condition": "RVOL_1_1_5",
+            "n": 1658,
+            "win_rate_pct": 44.692,
+            "expectancy_pct": -0.9284,
+            "profit_factor": 0.7555,
+            "median_mfe_pct": 5.0,
+            "median_mae_pct": -5.2786,
+            "median_days": 5.0
+          },
+          {
+            "condition": "RVOL_GE_3",
+            "n": 201,
+            "win_rate_pct": 41.791,
+            "expectancy_pct": -1.6154,
+            "profit_factor": 0.6927,
+            "median_mfe_pct": 5.9574,
+            "median_mae_pct": -8.4615,
+            "median_days": 5.0
+          }
+        ]
+      },
+      "FOREIGN": {
+        "n": 36344,
+        "win_rate_pct": 44.354,
+        "expectancy_pct": -0.9337,
+        "median_pnl_pct": -1.719,
+        "profit_factor": 0.7607,
+        "median_mfe_pct": 5.7143,
+        "median_mae_pct": -5.8252,
+        "median_duration": 5.0,
+        "tp1_rate_pct": 54.617,
+        "tp2_rate_pct": 20.042,
+        "tp3_rate_pct": 3.841,
+        "cl1_rate_pct": 58.1,
+        "cl2_rate_pct": 29.43,
+        "cl3_rate_pct": 6.961,
+        "conditions": [
+          {
+            "condition": "ATR_LT_1P5",
+            "n": 639,
+            "win_rate_pct": 40.376,
+            "expectancy_pct": -0.398,
+            "profit_factor": 0.5114,
+            "median_mfe_pct": 0.9967,
+            "median_mae_pct": -1.173,
+            "median_days": 3.0
+          },
+          {
+            "condition": "DOWNTREND",
+            "n": 8491,
+            "win_rate_pct": 47.474,
+            "expectancy_pct": -0.4143,
+            "profit_factor": 0.8988,
+            "median_mfe_pct": 6.5476,
+            "median_mae_pct": -6.4516,
+            "median_days": 5.0
+          },
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 9613,
+            "win_rate_pct": 46.323,
+            "expectancy_pct": -0.4587,
+            "profit_factor": 0.8728,
+            "median_mfe_pct": 6.1905,
+            "median_mae_pct": -5.6,
+            "median_days": 5.0
+          },
+          {
+            "condition": "ATR_1P5_3",
+            "n": 4461,
+            "win_rate_pct": 42.233,
+            "expectancy_pct": -0.6134,
+            "profit_factor": 0.5982,
+            "median_mfe_pct": 2.2222,
+            "median_mae_pct": -2.6923,
+            "median_days": 4.0
+          },
+          {
+            "condition": "SUPPORT_LT_1ATR",
+            "n": 8337,
+            "win_rate_pct": 45.136,
+            "expectancy_pct": -0.6906,
+            "profit_factor": 0.8406,
+            "median_mfe_pct": 6.1224,
+            "median_mae_pct": -6.5,
+            "median_days": 5.0
+          },
+          {
+            "condition": "CLOSE_LOW",
+            "n": 15663,
+            "win_rate_pct": 45.751,
+            "expectancy_pct": -0.6977,
+            "profit_factor": 0.8215,
+            "median_mfe_pct": 5.9701,
+            "median_mae_pct": -6.015,
+            "median_days": 5.0
+          },
+          {
+            "condition": "RVOL_LT_1",
+            "n": 24526,
+            "win_rate_pct": 45.278,
+            "expectancy_pct": -0.7099,
+            "profit_factor": 0.8171,
+            "median_mfe_pct": 5.9783,
+            "median_mae_pct": -5.814,
+            "median_days": 5.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 36344,
+            "win_rate_pct": 44.354,
+            "expectancy_pct": -0.9337,
+            "profit_factor": 0.7607,
+            "median_mfe_pct": 5.7143,
+            "median_mae_pct": -5.8252,
+            "median_days": 5.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 11055,
+            "win_rate_pct": 43.79,
+            "expectancy_pct": -0.9557,
+            "profit_factor": 0.7462,
+            "median_mfe_pct": 5.3571,
+            "median_mae_pct": -5.6604,
+            "median_days": 5.0
+          },
+          {
+            "condition": "RVOL_1_1_5",
+            "n": 5785,
+            "win_rate_pct": 44.546,
+            "expectancy_pct": -0.9606,
+            "profit_factor": 0.7228,
+            "median_mfe_pct": 4.9383,
+            "median_mae_pct": -5.1282,
+            "median_days": 4.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 31244,
+            "win_rate_pct": 44.738,
+            "expectancy_pct": -0.9904,
+            "profit_factor": 0.7699,
+            "median_mfe_pct": 6.9307,
+            "median_mae_pct": -6.7923,
+            "median_days": 5.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 9114,
+            "win_rate_pct": 42.791,
+            "expectancy_pct": -1.2057,
+            "profit_factor": 0.69,
+            "median_mfe_pct": 5.5799,
+            "median_mae_pct": -5.7377,
+            "median_days": 4.0
+          },
+          {
+            "condition": "UPTREND",
+            "n": 10371,
+            "win_rate_pct": 43.622,
+            "expectancy_pct": -1.3043,
+            "profit_factor": 0.6719,
+            "median_mfe_pct": 5.6497,
+            "median_mae_pct": -5.7143,
+            "median_days": 4.0
+          },
+          {
+            "condition": "RVOL_1_5_2",
+            "n": 2416,
+            "win_rate_pct": 42.55,
+            "expectancy_pct": -1.3812,
+            "profit_factor": 0.6516,
+            "median_mfe_pct": 4.9118,
+            "median_mae_pct": -5.8281,
+            "median_days": 4.0
+          },
+          {
+            "condition": "RVOL_2_3",
+            "n": 1915,
+            "win_rate_pct": 40.418,
+            "expectancy_pct": -1.9669,
+            "profit_factor": 0.5698,
+            "median_mfe_pct": 5.3691,
+            "median_mae_pct": -6.4327,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_GE_3",
+            "n": 1702,
+            "win_rate_pct": 37.368,
+            "expectancy_pct": -2.2694,
+            "profit_factor": 0.5314,
+            "median_mfe_pct": 6.8334,
+            "median_mae_pct": -8.1818,
+            "median_days": 3.0
+          }
+        ]
+      },
+      "MOMENTUM_FOREIGN": {
+        "n": 3078,
+        "win_rate_pct": 38.921,
+        "expectancy_pct": -2.0028,
+        "median_pnl_pct": -2.5317,
+        "profit_factor": 0.5419,
+        "median_mfe_pct": 5.8902,
+        "median_mae_pct": -6.7094,
+        "median_duration": 3.0,
+        "tp1_rate_pct": 58.09,
+        "tp2_rate_pct": 23.814,
+        "tp3_rate_pct": 5.88,
+        "cl1_rate_pct": 65.042,
+        "cl2_rate_pct": 40.838,
+        "cl3_rate_pct": 3.671,
+        "conditions": [
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 332,
+            "win_rate_pct": 47.289,
+            "expectancy_pct": -0.3023,
+            "profit_factor": 0.9203,
+            "median_mfe_pct": 6.1952,
+            "median_mae_pct": -5.8444,
+            "median_days": 4.0
+          },
+          {
+            "condition": "DOWNTREND",
+            "n": 275,
+            "win_rate_pct": 48.727,
+            "expectancy_pct": -0.5549,
+            "profit_factor": 0.8822,
+            "median_mfe_pct": 7.7586,
+            "median_mae_pct": -7.7778,
+            "median_days": 5.0
+          },
+          {
+            "condition": "ATR_1P5_3",
+            "n": 381,
+            "win_rate_pct": 36.745,
+            "expectancy_pct": -0.9372,
+            "profit_factor": 0.441,
+            "median_mfe_pct": 2.0408,
+            "median_mae_pct": -3.17,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_1_1_5",
+            "n": 800,
+            "win_rate_pct": 43.625,
+            "expectancy_pct": -1.0023,
+            "profit_factor": 0.7204,
+            "median_mfe_pct": 5.8026,
+            "median_mae_pct": -5.7893,
+            "median_days": 4.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 301,
+            "win_rate_pct": 41.528,
+            "expectancy_pct": -1.7165,
+            "profit_factor": 0.5868,
+            "median_mfe_pct": 4.9296,
+            "median_mae_pct": -6.1674,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_1_5_2",
+            "n": 781,
+            "win_rate_pct": 40.589,
+            "expectancy_pct": -1.7553,
+            "profit_factor": 0.5956,
+            "median_mfe_pct": 5.0505,
+            "median_mae_pct": -6.2016,
+            "median_days": 3.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 3078,
+            "win_rate_pct": 38.921,
+            "expectancy_pct": -2.0028,
+            "profit_factor": 0.5419,
+            "median_mfe_pct": 5.8902,
+            "median_mae_pct": -6.7094,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 2777,
+            "win_rate_pct": 38.639,
+            "expectancy_pct": -2.0338,
+            "profit_factor": 0.5373,
+            "median_mfe_pct": 6.0241,
+            "median_mae_pct": -6.7568,
+            "median_days": 3.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 2665,
+            "win_rate_pct": 39.287,
+            "expectancy_pct": -2.1728,
+            "profit_factor": 0.5473,
+            "median_mfe_pct": 7.0175,
+            "median_mae_pct": -7.6389,
+            "median_days": 3.0
+          },
+          {
+            "condition": "UPTREND",
+            "n": 1330,
+            "win_rate_pct": 38.647,
+            "expectancy_pct": -2.5632,
+            "profit_factor": 0.4647,
+            "median_mfe_pct": 6.0811,
+            "median_mae_pct": -6.7568,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_2_3",
+            "n": 744,
+            "win_rate_pct": 37.5,
+            "expectancy_pct": -2.61,
+            "profit_factor": 0.4572,
+            "median_mfe_pct": 5.6917,
+            "median_mae_pct": -6.5781,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_GE_3",
+            "n": 753,
+            "win_rate_pct": 33.599,
+            "expectancy_pct": -2.7224,
+            "profit_factor": 0.434,
+            "median_mfe_pct": 7.2,
+            "median_mae_pct": -8.5106,
+            "median_days": 2.0
+          }
+        ]
+      },
+      "MOMENTUM_RVOL2": {
+        "n": 2659,
+        "win_rate_pct": 34.637,
+        "expectancy_pct": -3.0546,
+        "median_pnl_pct": -3.1091,
+        "profit_factor": 0.4129,
+        "median_mfe_pct": 6.5476,
+        "median_mae_pct": -8.0,
+        "median_duration": 2.0,
+        "tp1_rate_pct": 59.421,
+        "tp2_rate_pct": 25.197,
+        "tp3_rate_pct": 7.522,
+        "cl1_rate_pct": 67.77,
+        "cl2_rate_pct": 44.791,
+        "cl3_rate_pct": 3.197,
+        "conditions": [
+          {
+            "condition": "ATR_1P5_3",
+            "n": 289,
+            "win_rate_pct": 38.062,
+            "expectancy_pct": -0.9012,
+            "profit_factor": 0.4559,
+            "median_mfe_pct": 2.2876,
+            "median_mae_pct": -3.321,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 252,
+            "win_rate_pct": 37.698,
+            "expectancy_pct": -2.168,
+            "profit_factor": 0.5065,
+            "median_mfe_pct": 5.1635,
+            "median_mae_pct": -7.5379,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_2_3",
+            "n": 1219,
+            "win_rate_pct": 38.638,
+            "expectancy_pct": -2.5806,
+            "profit_factor": 0.4696,
+            "median_mfe_pct": 5.6962,
+            "median_mae_pct": -6.4706,
+            "median_days": 3.0
+          },
+          {
+            "condition": "DOWNTREND",
+            "n": 167,
+            "win_rate_pct": 35.928,
+            "expectancy_pct": -2.6133,
+            "profit_factor": 0.5356,
+            "median_mfe_pct": 5.9603,
+            "median_mae_pct": -8.2645,
+            "median_days": 4.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 1497,
+            "win_rate_pct": 35.538,
+            "expectancy_pct": -2.6666,
+            "profit_factor": 0.4455,
+            "median_mfe_pct": 6.422,
+            "median_mae_pct": -7.6433,
+            "median_days": 3.0
+          },
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 195,
+            "win_rate_pct": 37.949,
+            "expectancy_pct": -2.769,
+            "profit_factor": 0.4817,
+            "median_mfe_pct": 5.7554,
+            "median_mae_pct": -6.7055,
+            "median_days": 4.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 2407,
+            "win_rate_pct": 34.317,
+            "expectancy_pct": -3.1475,
+            "profit_factor": 0.4048,
+            "median_mfe_pct": 6.7308,
+            "median_mae_pct": -8.209,
+            "median_days": 2.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 2344,
+            "win_rate_pct": 34.386,
+            "expectancy_pct": -3.3437,
+            "profit_factor": 0.4119,
+            "median_mfe_pct": 7.5949,
+            "median_mae_pct": -8.9888,
+            "median_days": 2.0
+          },
+          {
+            "condition": "RVOL_GE_3",
+            "n": 1440,
+            "win_rate_pct": 31.25,
+            "expectancy_pct": -3.4559,
+            "profit_factor": 0.3704,
+            "median_mfe_pct": 7.2376,
+            "median_mae_pct": -9.6521,
+            "median_days": 2.0
+          },
+          {
+            "condition": "UPTREND",
+            "n": 1113,
+            "win_rate_pct": 34.501,
+            "expectancy_pct": -3.5085,
+            "profit_factor": 0.3793,
+            "median_mfe_pct": 6.9364,
+            "median_mae_pct": -8.4507,
+            "median_days": 2.0
+          },
+          {
+            "condition": "FOREIGN_NEG",
+            "n": 1162,
+            "win_rate_pct": 33.477,
+            "expectancy_pct": -3.5546,
+            "profit_factor": 0.3775,
+            "median_mfe_pct": 6.8182,
+            "median_mae_pct": -8.7068,
+            "median_days": 2.0
+          }
+        ]
+      },
+      "ABSORPTION_FOREIGN": {
+        "n": 535,
+        "win_rate_pct": 41.869,
+        "expectancy_pct": -1.0822,
+        "median_pnl_pct": -1.4579,
+        "profit_factor": 0.6033,
+        "median_mfe_pct": 3.0488,
+        "median_mae_pct": -3.7037,
+        "median_duration": 4.0,
+        "tp1_rate_pct": 51.776,
+        "tp2_rate_pct": 18.692,
+        "tp3_rate_pct": 3.738,
+        "cl1_rate_pct": 62.056,
+        "cl2_rate_pct": 33.832,
+        "cl3_rate_pct": 9.346,
+        "conditions": [
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 105,
+            "win_rate_pct": 50.476,
+            "expectancy_pct": 0.1125,
+            "profit_factor": 1.0518,
+            "median_mfe_pct": 3.6517,
+            "median_mae_pct": -2.8571,
+            "median_days": 4.0
+          },
+          {
+            "condition": "ATR_1P5_3",
+            "n": 167,
+            "win_rate_pct": 40.719,
+            "expectancy_pct": -0.5989,
+            "profit_factor": 0.587,
+            "median_mfe_pct": 2.1739,
+            "median_mae_pct": -2.5,
+            "median_days": 4.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 334,
+            "win_rate_pct": 42.216,
+            "expectancy_pct": -0.8883,
+            "profit_factor": 0.6404,
+            "median_mfe_pct": 2.9703,
+            "median_mae_pct": -3.3638,
+            "median_days": 4.0
+          },
+          {
+            "condition": "RVOL_1_1_5",
+            "n": 270,
+            "win_rate_pct": 42.963,
+            "expectancy_pct": -0.911,
+            "profit_factor": 0.6459,
+            "median_mfe_pct": 3.5115,
+            "median_mae_pct": -3.6715,
+            "median_days": 4.0
+          },
+          {
+            "condition": "UPTREND",
+            "n": 170,
+            "win_rate_pct": 40.0,
+            "expectancy_pct": -1.0306,
+            "profit_factor": 0.5747,
+            "median_mfe_pct": 2.993,
+            "median_mae_pct": -3.4652,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_1_5_2",
+            "n": 168,
+            "win_rate_pct": 41.667,
+            "expectancy_pct": -1.0534,
+            "profit_factor": 0.5789,
+            "median_mfe_pct": 2.9745,
+            "median_mae_pct": -3.5276,
+            "median_days": 4.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 535,
+            "win_rate_pct": 41.869,
+            "expectancy_pct": -1.0822,
+            "profit_factor": 0.6033,
+            "median_mfe_pct": 3.0488,
+            "median_mae_pct": -3.7037,
+            "median_days": 4.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 201,
+            "win_rate_pct": 41.294,
+            "expectancy_pct": -1.4044,
+            "profit_factor": 0.555,
+            "median_mfe_pct": 3.211,
+            "median_mae_pct": -4.2105,
+            "median_days": 4.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 326,
+            "win_rate_pct": 42.638,
+            "expectancy_pct": -1.4264,
+            "profit_factor": 0.6071,
+            "median_mfe_pct": 4.5934,
+            "median_mae_pct": -5.4026,
+            "median_days": 4.0
+          },
+          {
+            "condition": "DOWNTREND",
+            "n": 108,
+            "win_rate_pct": 44.444,
+            "expectancy_pct": -1.557,
+            "profit_factor": 0.6112,
+            "median_mfe_pct": 4.2555,
+            "median_mae_pct": -4.748,
+            "median_days": 5.0
+          }
+        ]
+      },
+      "ABSORPTION_RVOL2": {
+        "n": 226,
+        "win_rate_pct": 40.708,
+        "expectancy_pct": -1.2871,
+        "median_pnl_pct": -1.4643,
+        "profit_factor": 0.5745,
+        "median_mfe_pct": 3.0731,
+        "median_mae_pct": -4.0817,
+        "median_duration": 4.0,
+        "tp1_rate_pct": 50.885,
+        "tp2_rate_pct": 19.469,
+        "tp3_rate_pct": 3.982,
+        "cl1_rate_pct": 57.522,
+        "cl2_rate_pct": 28.761,
+        "cl3_rate_pct": 12.389,
+        "conditions": [
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 141,
+            "win_rate_pct": 42.553,
+            "expectancy_pct": -0.7553,
+            "profit_factor": 0.6848,
+            "median_mfe_pct": 3.0973,
+            "median_mae_pct": -3.2609,
+            "median_days": 3.0
+          },
+          {
+            "condition": "FOREIGN_NEG",
+            "n": 129,
+            "win_rate_pct": 41.86,
+            "expectancy_pct": -1.0454,
+            "profit_factor": 0.6022,
+            "median_mfe_pct": 3.3133,
+            "median_mae_pct": -3.7037,
+            "median_days": 4.0
+          },
+          {
+            "condition": "RVOL_2_3",
+            "n": 172,
+            "win_rate_pct": 37.791,
+            "expectancy_pct": -1.3486,
+            "profit_factor": 0.544,
+            "median_mfe_pct": 2.6779,
+            "median_mae_pct": -4.2045,
+            "median_days": 4.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 120,
+            "win_rate_pct": 40.0,
+            "expectancy_pct": -1.9103,
+            "profit_factor": 0.5726,
+            "median_mfe_pct": 4.7379,
+            "median_mae_pct": -6.5353,
+            "median_days": 4.0
+          }
+        ]
+      },
+      "REVERSAL_FOREIGN": {
+        "n": 1473,
+        "win_rate_pct": 41.548,
+        "expectancy_pct": -1.4119,
+        "median_pnl_pct": -2.1932,
+        "profit_factor": 0.6676,
+        "median_mfe_pct": 5.6391,
+        "median_mae_pct": -6.5421,
+        "median_duration": 5.0,
+        "tp1_rate_pct": 51.527,
+        "tp2_rate_pct": 15.818,
+        "tp3_rate_pct": 2.444,
+        "cl1_rate_pct": 59.878,
+        "cl2_rate_pct": 28.988,
+        "cl3_rate_pct": 10.183,
+        "conditions": [
+          {
+            "condition": "ATR_1P5_3",
+            "n": 160,
+            "win_rate_pct": 36.25,
+            "expectancy_pct": -0.8556,
+            "profit_factor": 0.4773,
+            "median_mfe_pct": 2.1622,
+            "median_mae_pct": -2.8335,
+            "median_days": 4.0
+          },
+          {
+            "condition": "UPTREND",
+            "n": 395,
+            "win_rate_pct": 43.038,
+            "expectancy_pct": -0.8878,
+            "profit_factor": 0.7553,
+            "median_mfe_pct": 5.9172,
+            "median_mae_pct": -5.9406,
+            "median_days": 4.0
+          },
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 343,
+            "win_rate_pct": 41.691,
+            "expectancy_pct": -0.9774,
+            "profit_factor": 0.7541,
+            "median_mfe_pct": 5.5556,
+            "median_mae_pct": -5.7692,
+            "median_days": 6.0
+          },
+          {
+            "condition": "RVOL_LT_1",
+            "n": 1075,
+            "win_rate_pct": 41.674,
+            "expectancy_pct": -1.2857,
+            "profit_factor": 0.704,
+            "median_mfe_pct": 6.0729,
+            "median_mae_pct": -6.8783,
+            "median_days": 5.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 536,
+            "win_rate_pct": 41.418,
+            "expectancy_pct": -1.3168,
+            "profit_factor": 0.6753,
+            "median_mfe_pct": 5.6365,
+            "median_mae_pct": -6.4173,
+            "median_days": 5.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 1473,
+            "win_rate_pct": 41.548,
+            "expectancy_pct": -1.4119,
+            "profit_factor": 0.6676,
+            "median_mfe_pct": 5.6391,
+            "median_mae_pct": -6.5421,
+            "median_days": 5.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 937,
+            "win_rate_pct": 41.622,
+            "expectancy_pct": -1.4664,
+            "profit_factor": 0.6634,
+            "median_mfe_pct": 5.6452,
+            "median_mae_pct": -6.5574,
+            "median_days": 5.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 1293,
+            "win_rate_pct": 42.459,
+            "expectancy_pct": -1.4864,
+            "profit_factor": 0.678,
+            "median_mfe_pct": 6.6265,
+            "median_mae_pct": -7.4074,
+            "median_days": 5.0
+          },
+          {
+            "condition": "DOWNTREND",
+            "n": 421,
+            "win_rate_pct": 41.33,
+            "expectancy_pct": -1.5191,
+            "profit_factor": 0.6889,
+            "median_mfe_pct": 6.1905,
+            "median_mae_pct": -7.7551,
+            "median_days": 5.0
+          },
+          {
+            "condition": "RVOL_1_1_5",
+            "n": 253,
+            "win_rate_pct": 43.083,
+            "expectancy_pct": -1.581,
+            "profit_factor": 0.6014,
+            "median_mfe_pct": 4.5872,
+            "median_mae_pct": -4.7904,
+            "median_days": 4.0
+          },
+          {
+            "condition": "SUPPORT_LT_1ATR",
+            "n": 502,
+            "win_rate_pct": 38.247,
+            "expectancy_pct": -2.2971,
+            "profit_factor": 0.5759,
+            "median_mfe_pct": 5.4545,
+            "median_mae_pct": -8.2499,
+            "median_days": 5.0
+          }
+        ]
+      },
+      "REVERSAL_RVOL2": {
+        "n": 148,
+        "win_rate_pct": 46.622,
+        "expectancy_pct": -1.7303,
+        "median_pnl_pct": -1.3794,
+        "profit_factor": 0.5496,
+        "median_mfe_pct": 4.3519,
+        "median_mae_pct": -5.8397,
+        "median_duration": 4.0,
+        "tp1_rate_pct": 56.081,
+        "tp2_rate_pct": 12.162,
+        "tp3_rate_pct": 3.378,
+        "cl1_rate_pct": 56.757,
+        "cl2_rate_pct": 28.378,
+        "cl3_rate_pct": 11.486,
+        "conditions": [
+          {
+            "condition": "RVOL_2_3",
+            "n": 115,
+            "win_rate_pct": 43.478,
+            "expectancy_pct": -1.7614,
+            "profit_factor": 0.5308,
+            "median_mfe_pct": 4.0,
+            "median_mae_pct": -5.9406,
+            "median_days": 4.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 116,
+            "win_rate_pct": 44.828,
+            "expectancy_pct": -2.0952,
+            "profit_factor": 0.5376,
+            "median_mfe_pct": 5.9935,
+            "median_mae_pct": -7.3311,
+            "median_days": 4.0
+          }
+        ]
+      },
+      "PULLBACK": {
+        "n": 358,
+        "win_rate_pct": 47.207,
+        "expectancy_pct": 0.4186,
+        "median_pnl_pct": -0.9573,
+        "profit_factor": 1.143,
+        "median_mfe_pct": 5.7418,
+        "median_mae_pct": -4.8096,
+        "median_duration": 6.0,
+        "tp1_rate_pct": 53.352,
+        "tp2_rate_pct": 23.184,
+        "tp3_rate_pct": 4.749,
+        "cl1_rate_pct": 50.559,
+        "cl2_rate_pct": 17.598,
+        "cl3_rate_pct": 7.542,
+        "conditions": [
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 140,
+            "win_rate_pct": 48.571,
+            "expectancy_pct": 1.0148,
+            "profit_factor": 1.374,
+            "median_mfe_pct": 5.1658,
+            "median_mae_pct": -4.6441,
+            "median_days": 5.0
+          },
+          {
+            "condition": "UPTREND",
+            "n": 174,
+            "win_rate_pct": 51.149,
+            "expectancy_pct": 0.9493,
+            "profit_factor": 1.3046,
+            "median_mfe_pct": 6.5342,
+            "median_mae_pct": -4.991,
+            "median_days": 6.0
+          },
+          {
+            "condition": "FOREIGN_NEG",
+            "n": 170,
+            "win_rate_pct": 50.0,
+            "expectancy_pct": 0.8054,
+            "profit_factor": 1.2948,
+            "median_mfe_pct": 5.7772,
+            "median_mae_pct": -4.2542,
+            "median_days": 6.0
+          },
+          {
+            "condition": "RVOL_LT_1",
+            "n": 293,
+            "win_rate_pct": 49.147,
+            "expectancy_pct": 0.7357,
+            "profit_factor": 1.2493,
+            "median_mfe_pct": 6.4815,
+            "median_mae_pct": -5.0314,
+            "median_days": 6.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 309,
+            "win_rate_pct": 50.485,
+            "expectancy_pct": 0.702,
+            "profit_factor": 1.2269,
+            "median_mfe_pct": 6.9124,
+            "median_mae_pct": -5.303,
+            "median_days": 6.0
+          },
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 311,
+            "win_rate_pct": 45.981,
+            "expectancy_pct": 0.1506,
+            "profit_factor": 1.0493,
+            "median_mfe_pct": 5.5046,
+            "median_mae_pct": -4.918,
+            "median_days": 6.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 188,
+            "win_rate_pct": 44.681,
+            "expectancy_pct": 0.0688,
+            "profit_factor": 1.0221,
+            "median_mfe_pct": 5.5923,
+            "median_mae_pct": -5.0951,
+            "median_days": 6.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 218,
+            "win_rate_pct": 46.33,
+            "expectancy_pct": 0.0356,
+            "profit_factor": 1.0116,
+            "median_mfe_pct": 6.0065,
+            "median_mae_pct": -4.918,
+            "median_days": 6.0
+          }
+        ]
+      },
+      "MOMENTUM": {
+        "n": 5299,
+        "win_rate_pct": 38.271,
+        "expectancy_pct": -2.2672,
+        "median_pnl_pct": -2.6603,
+        "profit_factor": 0.5084,
+        "median_mfe_pct": 5.8219,
+        "median_mae_pct": -6.8421,
+        "median_duration": 3.0,
+        "tp1_rate_pct": 57.369,
+        "tp2_rate_pct": 23.155,
+        "tp3_rate_pct": 5.718,
+        "cl1_rate_pct": 65.182,
+        "cl2_rate_pct": 40.913,
+        "cl3_rate_pct": 3.812,
+        "conditions": [
+          {
+            "condition": "DOWNTREND",
+            "n": 571,
+            "win_rate_pct": 47.11,
+            "expectancy_pct": -0.5316,
+            "profit_factor": 0.8718,
+            "median_mfe_pct": 6.9519,
+            "median_mae_pct": -6.5728,
+            "median_days": 5.0
+          },
+          {
+            "condition": "ATR_1P5_3",
+            "n": 703,
+            "win_rate_pct": 38.407,
+            "expectancy_pct": -0.8402,
+            "profit_factor": 0.48,
+            "median_mfe_pct": 2.2831,
+            "median_mae_pct": -3.0837,
+            "median_days": 3.0
+          },
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 682,
+            "win_rate_pct": 44.721,
+            "expectancy_pct": -1.0004,
+            "profit_factor": 0.7464,
+            "median_mfe_pct": 5.6767,
+            "median_mae_pct": -5.6099,
+            "median_days": 4.0
+          },
+          {
+            "condition": "RVOL_1_1_5",
+            "n": 1338,
+            "win_rate_pct": 43.049,
+            "expectancy_pct": -1.078,
+            "profit_factor": 0.7013,
+            "median_mfe_pct": 5.3064,
+            "median_mae_pct": -5.6364,
+            "median_days": 4.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 523,
+            "win_rate_pct": 39.771,
+            "expectancy_pct": -1.7351,
+            "profit_factor": 0.5825,
+            "median_mfe_pct": 5.1136,
+            "median_mae_pct": -6.25,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_1_5_2",
+            "n": 1302,
+            "win_rate_pct": 40.783,
+            "expectancy_pct": -1.881,
+            "profit_factor": 0.576,
+            "median_mfe_pct": 5.3357,
+            "median_mae_pct": -6.0492,
+            "median_days": 3.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 3078,
+            "win_rate_pct": 38.921,
+            "expectancy_pct": -2.0028,
+            "profit_factor": 0.5419,
+            "median_mfe_pct": 5.8902,
+            "median_mae_pct": -6.7094,
+            "median_days": 3.0
+          },
+          {
+            "condition": "SUPPORT_LT_1ATR",
+            "n": 191,
+            "win_rate_pct": 36.649,
+            "expectancy_pct": -2.1052,
+            "profit_factor": 0.6095,
+            "median_mfe_pct": 5.9603,
+            "median_mae_pct": -7.3333,
+            "median_days": 5.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 4776,
+            "win_rate_pct": 38.107,
+            "expectancy_pct": -2.3254,
+            "profit_factor": 0.5012,
+            "median_mfe_pct": 5.9341,
+            "median_mae_pct": -6.9307,
+            "median_days": 3.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 4545,
+            "win_rate_pct": 38.35,
+            "expectancy_pct": -2.5051,
+            "profit_factor": 0.5104,
+            "median_mfe_pct": 7.0922,
+            "median_mae_pct": -7.9268,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_2_3",
+            "n": 1219,
+            "win_rate_pct": 38.638,
+            "expectancy_pct": -2.5806,
+            "profit_factor": 0.4696,
+            "median_mfe_pct": 5.6962,
+            "median_mae_pct": -6.4706,
+            "median_days": 3.0
+          },
+          {
+            "condition": "FOREIGN_NEG",
+            "n": 2221,
+            "win_rate_pct": 37.371,
+            "expectancy_pct": -2.6336,
+            "profit_factor": 0.4674,
+            "median_mfe_pct": 5.7143,
+            "median_mae_pct": -7.1429,
+            "median_days": 3.0
+          },
+          {
+            "condition": "UPTREND",
+            "n": 2086,
+            "win_rate_pct": 37.296,
+            "expectancy_pct": -2.8852,
+            "profit_factor": 0.4337,
+            "median_mfe_pct": 5.9855,
+            "median_mae_pct": -7.2756,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_GE_3",
+            "n": 1440,
+            "win_rate_pct": 31.25,
+            "expectancy_pct": -3.4559,
+            "profit_factor": 0.3704,
+            "median_mfe_pct": 7.2376,
+            "median_mae_pct": -9.6521,
+            "median_days": 2.0
+          }
+        ]
+      },
+      "ABSORPTION": {
+        "n": 1067,
+        "win_rate_pct": 43.58,
+        "expectancy_pct": -0.7367,
+        "median_pnl_pct": -1.1565,
+        "profit_factor": 0.7015,
+        "median_mfe_pct": 3.5019,
+        "median_mae_pct": -3.6364,
+        "median_duration": 4.0,
+        "tp1_rate_pct": 53.983,
+        "tp2_rate_pct": 19.775,
+        "tp3_rate_pct": 4.217,
+        "cl1_rate_pct": 59.7,
+        "cl2_rate_pct": 31.396,
+        "cl3_rate_pct": 9.466,
+        "conditions": [
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 223,
+            "win_rate_pct": 47.982,
+            "expectancy_pct": 0.0222,
+            "profit_factor": 1.0112,
+            "median_mfe_pct": 3.8168,
+            "median_mae_pct": -2.8169,
+            "median_days": 4.0
+          },
+          {
+            "condition": "FOREIGN_NEG",
+            "n": 532,
+            "win_rate_pct": 45.301,
+            "expectancy_pct": -0.3892,
+            "profit_factor": 0.8236,
+            "median_mfe_pct": 3.6383,
+            "median_mae_pct": -3.4724,
+            "median_days": 4.0
+          },
+          {
+            "condition": "ATR_1P5_3",
+            "n": 354,
+            "win_rate_pct": 44.068,
+            "expectancy_pct": -0.446,
+            "profit_factor": 0.6746,
+            "median_mfe_pct": 2.3062,
+            "median_mae_pct": -2.4,
+            "median_days": 3.0
+          },
+          {
+            "condition": "RVOL_1_1_5",
+            "n": 504,
+            "win_rate_pct": 43.651,
+            "expectancy_pct": -0.523,
+            "profit_factor": 0.771,
+            "median_mfe_pct": 3.6298,
+            "median_mae_pct": -3.6364,
+            "median_days": 4.0
+          },
+          {
+            "condition": "UPTREND",
+            "n": 284,
+            "win_rate_pct": 43.662,
+            "expectancy_pct": -0.5916,
+            "profit_factor": 0.7426,
+            "median_mfe_pct": 3.6058,
+            "median_mae_pct": -3.4466,
+            "median_days": 3.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 665,
+            "win_rate_pct": 43.008,
+            "expectancy_pct": -0.5963,
+            "profit_factor": 0.7317,
+            "median_mfe_pct": 3.4247,
+            "median_mae_pct": -3.2558,
+            "median_days": 4.0
+          },
+          {
+            "condition": "RVOL_1_5_2",
+            "n": 337,
+            "win_rate_pct": 45.401,
+            "expectancy_pct": -0.6871,
+            "profit_factor": 0.7101,
+            "median_mfe_pct": 3.6078,
+            "median_mae_pct": -3.3333,
+            "median_days": 4.0
+          },
+          {
+            "condition": "DOWNTREND",
+            "n": 275,
+            "win_rate_pct": 46.182,
+            "expectancy_pct": -0.8926,
+            "profit_factor": 0.7035,
+            "median_mfe_pct": 3.9216,
+            "median_mae_pct": -4.1812,
+            "median_days": 4.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 633,
+            "win_rate_pct": 43.444,
+            "expectancy_pct": -0.9433,
+            "profit_factor": 0.7132,
+            "median_mfe_pct": 5.1724,
+            "median_mae_pct": -5.4902,
+            "median_days": 4.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 402,
+            "win_rate_pct": 44.527,
+            "expectancy_pct": -0.9688,
+            "profit_factor": 0.6628,
+            "median_mfe_pct": 3.5621,
+            "median_mae_pct": -4.2632,
+            "median_days": 4.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 535,
+            "win_rate_pct": 41.869,
+            "expectancy_pct": -1.0822,
+            "profit_factor": 0.6033,
+            "median_mfe_pct": 3.0488,
+            "median_mae_pct": -3.7037,
+            "median_days": 4.0
+          },
+          {
+            "condition": "SUPPORT_LT_1ATR",
+            "n": 266,
+            "win_rate_pct": 43.233,
+            "expectancy_pct": -1.2772,
+            "profit_factor": 0.5789,
+            "median_mfe_pct": 3.0375,
+            "median_mae_pct": -4.1812,
+            "median_days": 4.0
+          },
+          {
+            "condition": "RVOL_2_3",
+            "n": 172,
+            "win_rate_pct": 37.791,
+            "expectancy_pct": -1.3486,
+            "profit_factor": 0.544,
+            "median_mfe_pct": 2.6779,
+            "median_mae_pct": -4.2045,
+            "median_days": 4.0
+          }
+        ]
+      },
+      "REVERSAL": {
+        "n": 2907,
+        "win_rate_pct": 42.14,
+        "expectancy_pct": -1.3026,
+        "median_pnl_pct": -2.1328,
+        "profit_factor": 0.6768,
+        "median_mfe_pct": 5.2209,
+        "median_mae_pct": -6.1162,
+        "median_duration": 5.0,
+        "tp1_rate_pct": 51.221,
+        "tp2_rate_pct": 15.961,
+        "tp3_rate_pct": 2.614,
+        "cl1_rate_pct": 58.789,
+        "cl2_rate_pct": 28.621,
+        "cl3_rate_pct": 9.77,
+        "conditions": [
+          {
+            "condition": "ATR_1P5_3",
+            "n": 356,
+            "win_rate_pct": 40.169,
+            "expectancy_pct": -0.6957,
+            "profit_factor": 0.549,
+            "median_mfe_pct": 2.3473,
+            "median_mae_pct": -2.6281,
+            "median_days": 4.0
+          },
+          {
+            "condition": "SUPPORT_1_2ATR",
+            "n": 690,
+            "win_rate_pct": 43.043,
+            "expectancy_pct": -0.7606,
+            "profit_factor": 0.7969,
+            "median_mfe_pct": 5.0858,
+            "median_mae_pct": -5.7377,
+            "median_days": 6.0
+          },
+          {
+            "condition": "UPTREND",
+            "n": 661,
+            "win_rate_pct": 41.301,
+            "expectancy_pct": -0.9714,
+            "profit_factor": 0.7278,
+            "median_mfe_pct": 5.4152,
+            "median_mae_pct": -5.8333,
+            "median_days": 4.0
+          },
+          {
+            "condition": "DOWNTREND",
+            "n": 908,
+            "win_rate_pct": 44.604,
+            "expectancy_pct": -1.0926,
+            "profit_factor": 0.7421,
+            "median_mfe_pct": 5.5556,
+            "median_mae_pct": -6.5914,
+            "median_days": 5.0
+          },
+          {
+            "condition": "RVOL_LT_1",
+            "n": 2065,
+            "win_rate_pct": 42.034,
+            "expectancy_pct": -1.1323,
+            "profit_factor": 0.7262,
+            "median_mfe_pct": 5.7471,
+            "median_mae_pct": -6.383,
+            "median_days": 5.0
+          },
+          {
+            "condition": "FOREIGN_NEG",
+            "n": 1434,
+            "win_rate_pct": 42.748,
+            "expectancy_pct": -1.1903,
+            "profit_factor": 0.6873,
+            "median_mfe_pct": 4.7333,
+            "median_mae_pct": -5.814,
+            "median_days": 5.0
+          },
+          {
+            "condition": "CLOSE_HIGH",
+            "n": 1018,
+            "win_rate_pct": 42.043,
+            "expectancy_pct": -1.2704,
+            "profit_factor": 0.6781,
+            "median_mfe_pct": 5.3356,
+            "median_mae_pct": -6.2189,
+            "median_days": 5.0
+          },
+          {
+            "condition": "CLOSE_MID",
+            "n": 1889,
+            "win_rate_pct": 42.192,
+            "expectancy_pct": -1.32,
+            "profit_factor": 0.676,
+            "median_mfe_pct": 5.1282,
+            "median_mae_pct": -6.087,
+            "median_days": 5.0
+          },
+          {
+            "condition": "ATR_GE_3",
+            "n": 2514,
+            "win_rate_pct": 42.721,
+            "expectancy_pct": -1.3932,
+            "profit_factor": 0.6851,
+            "median_mfe_pct": 6.2708,
+            "median_mae_pct": -7.0987,
+            "median_days": 5.0
+          },
+          {
+            "condition": "FOREIGN_POS",
+            "n": 1473,
+            "win_rate_pct": 41.548,
+            "expectancy_pct": -1.4119,
+            "profit_factor": 0.6676,
+            "median_mfe_pct": 5.6391,
+            "median_mae_pct": -6.5421,
+            "median_days": 5.0
+          },
+          {
+            "condition": "RVOL_1_5_2",
+            "n": 181,
+            "win_rate_pct": 41.989,
+            "expectancy_pct": -1.7073,
+            "profit_factor": 0.5061,
+            "median_mfe_pct": 3.8095,
+            "median_mae_pct": -5.4545,
+            "median_days": 4.0
+          },
+          {
+            "condition": "RVOL_1_1_5",
+            "n": 513,
+            "win_rate_pct": 41.326,
+            "expectancy_pct": -1.7219,
+            "profit_factor": 0.5541,
+            "median_mfe_pct": 4.0,
+            "median_mae_pct": -5.4422,
+            "median_days": 4.0
+          },
+          {
+            "condition": "RVOL_2_3",
+            "n": 115,
+            "win_rate_pct": 43.478,
+            "expectancy_pct": -1.7614,
+            "profit_factor": 0.5308,
+            "median_mfe_pct": 4.0,
+            "median_mae_pct": -5.9406,
+            "median_days": 4.0
+          },
+          {
+            "condition": "SUPPORT_LT_1ATR",
+            "n": 1031,
+            "win_rate_pct": 41.222,
+            "expectancy_pct": -1.8573,
+            "profit_factor": 0.6063,
+            "median_mfe_pct": 4.8649,
+            "median_mae_pct": -6.9767,
+            "median_days": 5.0
+          }
+        ]
+      }
+    }
+  }
+}

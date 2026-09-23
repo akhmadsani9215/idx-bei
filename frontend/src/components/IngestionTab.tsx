@@ -11,9 +11,10 @@ import {
   Layers,
   TrendingUp,
   Play,
+  Clock,
 } from 'lucide-react';
 import { fetchIngestionStatus, triggerIngestion } from '../services/api';
-import type { IngestionStatusResponse, BackfillTier } from '../types';
+import type { IngestionStatusResponse, BackfillTier, FreshnessStatus, OrchestrationPipeline } from '../types';
 
 interface IngestionTabProps {
   lastLiveEvent?: any;
@@ -28,6 +29,9 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
   const [isTriggering, setIsTriggering] = useState<boolean>(false);
   const [triggerMessage, setTriggerMessage] = useState<string | null>(null);
   const [activeJob, setActiveJob] = useState<{ id: string; progress: number; message: string } | null>(null);
+  const [histStart, setHistStart] = useState<string>('');
+  const [histEnd, setHistEnd] = useState<string>('');
+  const [ownershipPath, setOwnershipPath] = useState<string>('');
 
   const loadStatus = useCallback(async () => {
     try {
@@ -57,11 +61,16 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
       });
     } else if (lastLiveEvent.type === 'ingestion_completed') {
       setActiveJob(null);
-      setTriggerMessage('Ingestion task completed successfully!');
+      const overall = lastLiveEvent.overall_status;
+      setTriggerMessage(
+        overall
+          ? `Job finished — overall status: ${overall}`
+          : (lastLiveEvent.message || 'Ingestion task completed.'),
+      );
       loadStatus();
     } else if (lastLiveEvent.type === 'ingestion_error') {
       setActiveJob(null);
-      setError(`Ingestion error: ${lastLiveEvent.error}`);
+      setError(`Ingestion error: ${lastLiveEvent.error || 'unknown error'}`);
     }
   }, [lastLiveEvent, loadStatus]);
 
@@ -75,15 +84,15 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
           const job = await resp.json();
           if (job.status === 'completed') {
             setActiveJob(null);
-            setTriggerMessage(job.message || 'Ingestion completed successfully.');
+            setTriggerMessage(job.message || 'Ingestion completed.');
             loadStatus();
           } else if (job.status === 'failed') {
             setActiveJob(null);
-            setError(`Job failed: ${job.message}`);
+            setError(`Job failed: ${job.message || 'unknown error'}`);
           } else {
             setActiveJob({
               id: job.job_id,
-              progress: job.progress_pct || 50,
+              progress: typeof job.progress_pct === 'number' ? job.progress_pct : 0,
               message: job.message || 'Processing ingestion...',
             });
           }
@@ -101,6 +110,79 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
+  const handleTriggerSyncAll = async () => {
+    try {
+      setIsTriggering(true);
+      setTriggerMessage(null);
+      setError(null);
+      const res = await triggerIngestion({ job_type: 'sync_all' });
+      setActiveJob({
+        id: res.job_id,
+        progress: 10,
+        message: 'Sync All Data orchestrator scheduled...',
+      });
+      setTriggerMessage('Sync All Data started in background. Pipeline statuses update when the job finishes.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to trigger Sync All Data');
+    } finally {
+      setIsTriggering(false);
+    }
+  };
+
+  const handleTriggerHistorical = async () => {
+    if (!histStart.trim() || !histEnd.trim()) {
+      setError('Historical backfill requires explicit start and end dates (YYYY-MM-DD or YYYYMMDD).');
+      return;
+    }
+    try {
+      setIsTriggering(true);
+      setTriggerMessage(null);
+      setError(null);
+      const res = await triggerIngestion({
+        job_type: 'backfill',
+        start_date: histStart.trim(),
+        end_date: histEnd.trim(),
+        concurrency: 4,
+      });
+      setActiveJob({
+        id: res.job_id,
+        progress: 10,
+        message: `Historical backfill ${histStart} → ${histEnd} scheduled...`,
+      });
+      setTriggerMessage(`Historical backfill job started (${histStart} → ${histEnd}).`);
+    } catch (err: any) {
+      setError(err.message || 'Failed to trigger historical backfill');
+    } finally {
+      setIsTriggering(false);
+    }
+  };
+
+  const handleTriggerOwnership = async () => {
+    if (!ownershipPath.trim()) {
+      setError('Ownership ingest requires an explicit local CSV path or http(s) URL.');
+      return;
+    }
+    try {
+      setIsTriggering(true);
+      setTriggerMessage(null);
+      setError(null);
+      const res = await triggerIngestion({
+        job_type: 'ownership',
+        path_or_url: ownershipPath.trim(),
+      });
+      setActiveJob({
+        id: res.job_id,
+        progress: 10,
+        message: 'Ownership ingest scheduled...',
+      });
+      setTriggerMessage('Ownership ingest started from the provided path/URL.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to trigger ownership ingest');
+    } finally {
+      setIsTriggering(false);
+    }
+  };
+
   const handleTriggerDaily = async () => {
     try {
       setIsTriggering(true);
@@ -115,7 +197,11 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
     }
   };
 
-  const handleTriggerTier = async (tier: BackfillTier) => {
+  const handleTriggerTier = async (tier: BackfillTier | undefined) => {
+    if (!tier) {
+      setError('No backfill tier available to trigger.');
+      return;
+    }
     if (tier.trading_days_to_fetch === 0) {
       setTriggerMessage(`${tier.name} is already 100% up to date with zero missing trading sessions!`);
       return;
@@ -171,12 +257,53 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
   const inv = data.inventory;
   const gaps = data.gaps;
   const recs = data.recommendations;
-  const activeTierObj = recs.tiers.find((t) => t.tier === selectedTier) || recs.tiers[1];
+  const freshness = data.freshness;
+  const missingDays: string[] = Array.isArray(gaps?.true_missing_trading_days)
+    ? gaps.true_missing_trading_days
+    : [];
+  const missingCount = gaps?.true_missing_trading_days_count ?? missingDays.length;
+  const activeTierObj =
+    (Array.isArray(recs?.tiers) && recs.tiers.find((t) => t.tier === selectedTier)) ||
+    (Array.isArray(recs?.tiers) ? recs.tiers[1] : undefined);
+  const fxQuote = inv?.system?.usd_idr;
 
   const getStatusColor = (status: string) => {
     if (status === 'healthy') return '#22c55e';
     if (status === 'warning') return '#eab308';
     return '#ef4444';
+  };
+
+  const getFreshnessColor = (status: FreshnessStatus) => {
+    if (status === 'current') return '#22c55e';
+    if (status === 'screener_stale' || status === 'screener_missing') return '#eab308';
+    return '#94a3b8';
+  };
+
+  const formatTs = (value: string | null | undefined) => {
+    if (!value) return 'Not available';
+    return value.replace('T', ' ').slice(0, 19);
+  };
+
+  const freshnessLabel = (status: FreshnessStatus) => {
+    if (status === 'current') return 'Current';
+    if (status === 'screener_stale') return 'Screener lagging';
+    if (status === 'screener_missing') return 'Screener missing';
+    return 'Unknown';
+  };
+
+  const orch = data.orchestration;
+  const pipelines: OrchestrationPipeline[] = Array.isArray(orch?.pipelines) ? orch.pipelines : [];
+  const integrations = orch?.integrations || {};
+  const lastSync = orch?.last_sync_all;
+  const overallSync = lastSync?.overall_status;
+
+  const pipelineStatusColor = (status: string) => {
+    const s = (status || '').toUpperCase();
+    if (s === 'SUCCESS') return '#22c55e';
+    if (s === 'PARTIAL' || s === 'RUNNING') return '#eab308';
+    if (s === 'FAILED') return '#ef4444';
+    if (s === 'UNAVAILABLE') return '#64748b';
+    return '#94a3b8';
   };
 
   return (
@@ -215,7 +342,7 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
               <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#f8fafc', margin: 0, letterSpacing: '-0.5px' }}>
-                Data Ingestion & Historical Backfill Status
+                RitelInsight Data Center
               </h1>
               <span
                 style={{
@@ -233,7 +360,7 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
               </span>
             </div>
             <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              Timeseries storage inventory, calendar gap detection, and quantitative backfill depth analysis.
+              Pipeline orchestration and monitoring for available data sources — no fabricated connectivity.
             </p>
           </div>
         </div>
@@ -249,7 +376,7 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
             <button
               onClick={loadStatus}
               disabled={loading}
@@ -272,6 +399,28 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
             </button>
 
             <button
+              onClick={handleTriggerSyncAll}
+              disabled={isTriggering || activeJob !== null}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.65rem 1.25rem',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #059669 0%, #34d399 100%)',
+                border: 'none',
+                color: '#fff',
+                cursor: isTriggering || activeJob ? 'not-allowed' : 'pointer',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                boxShadow: '0 4px 15px rgba(52, 211, 153, 0.3)',
+              }}
+            >
+              <Play size={15} fill="#fff" />
+              <span>SYNC ALL DATA</span>
+            </button>
+
+            <button
               onClick={handleTriggerDaily}
               disabled={isTriggering || activeJob !== null}
               style={{
@@ -283,7 +432,7 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
                 background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
                 border: 'none',
                 color: '#fff',
-                cursor: isTriggering ? 'not-allowed' : 'pointer',
+                cursor: isTriggering || activeJob ? 'not-allowed' : 'pointer',
                 fontWeight: 700,
                 fontSize: '0.85rem',
                 boxShadow: '0 4px 15px rgba(56, 189, 248, 0.3)',
@@ -346,6 +495,406 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
         </div>
       )}
 
+      {error && data && (
+        <div
+          style={{
+            background: 'rgba(239, 68, 68, 0.12)',
+            border: '1px solid rgba(239, 68, 68, 0.35)',
+            borderRadius: '12px',
+            padding: '0.85rem 1.25rem',
+            color: '#fca5a5',
+            fontSize: '0.85rem',
+            fontWeight: 600,
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {/* Integration honesty + pipeline orchestration */}
+      <div
+        style={{
+          background: 'rgba(15, 23, 42, 0.7)',
+          borderRadius: '14px',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          padding: '1.5rem',
+        }}
+      >
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.25rem' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: '#f8fafc' }}>
+              Pipeline Orchestration
+            </h2>
+            <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+              Overall Sync All:{' '}
+              <strong style={{ color: pipelineStatusColor(String(overallSync || 'IDLE')) }}>
+                {overallSync || 'IDLE'}
+              </strong>
+              {lastSync?.completed_at ? ` · last finished ${formatTs(lastSync.completed_at)}` : ''}
+            </p>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            {([
+              ['Realtime', integrations.realtime],
+              ['AI', integrations.ai],
+              ['Telegram', integrations.telegram],
+              ['Payment', integrations.payment],
+            ] as const).map(([label, status]) => (
+              <span
+                key={label}
+                style={{
+                  padding: '0.35rem 0.7rem',
+                  borderRadius: '8px',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.02em',
+                  background: 'rgba(100, 116, 139, 0.2)',
+                  color: '#94a3b8',
+                  border: '1px solid rgba(148, 163, 184, 0.25)',
+                }}
+              >
+                {label}: {status || 'NOT_CONFIGURED'}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {fxQuote && (
+          <div
+            style={{
+              marginBottom: '1rem',
+              padding: '0.75rem 1rem',
+              borderRadius: 8,
+              border: '1px solid rgba(148, 163, 184, 0.25)',
+              background: 'rgba(15, 23, 42, 0.45)',
+              fontSize: '0.78rem',
+              color: '#cbd5e1',
+            }}
+          >
+            <strong style={{ color: '#e2e8f0' }}>USD/IDR FX</strong>
+            {': '}
+            {fxQuote.rate != null ? fxQuote.rate : '—'}
+            {' · '}
+            status={fxQuote.status || 'unknown'}
+            {' · '}
+            {fxQuote.is_market_quote
+              ? 'market-quote (cached/live — not verified commercial)'
+              : fxQuote.is_default_constant
+                ? 'DEFAULT CONSTANT — not a market quote'
+                : 'not a verified market quote'}
+            {fxQuote.source ? ` · source=${fxQuote.source}` : ''}
+            {fxQuote.last_updated ? ` · as_of=${fxQuote.last_updated}` : ''}
+          </div>
+        )}
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: '0.85rem',
+          }}
+        >
+          {pipelines.map((p) => {
+            const st = String(p.status || 'IDLE');
+            const color = pipelineStatusColor(st);
+            const warnings = Array.isArray(p.warnings) ? p.warnings : [];
+            const errors = Array.isArray(p.errors) ? p.errors : [];
+            return (
+              <div
+                key={p.id}
+                style={{
+                  background: 'rgba(2, 6, 23, 0.55)',
+                  border: `1px solid ${color}33`,
+                  borderRadius: '12px',
+                  padding: '1rem',
+                  minHeight: '140px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                  <div style={{ fontWeight: 700, color: '#e2e8f0', fontSize: '0.9rem' }}>{p.label}</div>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 800, color }}>{st}</span>
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                  <div>Availability: {p.availability || '—'}</div>
+                  <div>Source: {p.source || '—'}</div>
+                  <div>Records: {p.records == null ? '—' : p.records}</div>
+                  <div>Quality: {p.quality == null || p.quality === '' ? '—' : String(p.quality)}</div>
+                  <div>Updated: {formatTs(p.completed_at)}</div>
+                  {p.duration_sec != null && <div>Duration: {p.duration_sec}s</div>}
+                </div>
+                {warnings.length > 0 && (
+                  <div style={{ marginTop: '0.5rem', fontSize: '0.72rem', color: '#fbbf24' }}>
+                    {warnings.slice(0, 2).join(' · ')}
+                  </div>
+                )}
+                {errors.length > 0 && (
+                  <div style={{ marginTop: '0.35rem', fontSize: '0.72rem', color: '#f87171' }}>
+                    {errors.slice(0, 2).join(' · ')}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {pipelines.length === 0 && (
+            <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+              Orchestration catalog not yet available from API.
+            </div>
+          )}
+        </div>
+
+        {/* Parameterized Historical + Ownership (manual; not Sync All) */}
+        <div
+          style={{
+            marginTop: '1.25rem',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '1rem',
+          }}
+        >
+          <div
+            style={{
+              background: 'rgba(2, 6, 23, 0.45)',
+              border: '1px solid rgba(234, 179, 8, 0.25)',
+              borderRadius: '12px',
+              padding: '1rem',
+            }}
+          >
+            <div style={{ fontWeight: 700, color: '#f8fafc', marginBottom: '0.35rem' }}>
+              Historical — Manual Backfill
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#fbbf24', marginBottom: '0.75rem' }}>
+              PARTIAL · requires explicit date range · not in Sync All
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <input
+                type="text"
+                placeholder="Start (YYYY-MM-DD or YYYYMMDD)"
+                value={histStart}
+                onChange={(e) => setHistStart(e.target.value)}
+                className="filter-input"
+                style={{ padding: '0.5rem', borderRadius: '8px' }}
+              />
+              <input
+                type="text"
+                placeholder="End (YYYY-MM-DD or YYYYMMDD)"
+                value={histEnd}
+                onChange={(e) => setHistEnd(e.target.value)}
+                className="filter-input"
+                style={{ padding: '0.5rem', borderRadius: '8px' }}
+              />
+              <button
+                onClick={handleTriggerHistorical}
+                disabled={isTriggering || activeJob !== null}
+                style={{
+                  padding: '0.55rem 0.9rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: '#ca8a04',
+                  color: '#fff',
+                  fontWeight: 700,
+                  cursor: isTriggering || activeJob ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Run Historical Backfill
+              </button>
+            </div>
+          </div>
+
+          <div
+            style={{
+              background: 'rgba(2, 6, 23, 0.45)',
+              border: '1px solid rgba(100, 116, 139, 0.35)',
+              borderRadius: '12px',
+              padding: '1rem',
+            }}
+          >
+            <div style={{ fontWeight: 700, color: '#f8fafc', marginBottom: '0.35rem' }}>
+              Ownership — Parameterized Ingest
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: '0.75rem' }}>
+              UNAVAILABLE for Sync All · requires explicit CSV path or http(s) URL · no default source
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <input
+                type="text"
+                placeholder="path_or_url (local file or https://...)"
+                value={ownershipPath}
+                onChange={(e) => setOwnershipPath(e.target.value)}
+                className="filter-input"
+                style={{ padding: '0.5rem', borderRadius: '8px' }}
+              />
+              <button
+                onClick={handleTriggerOwnership}
+                disabled={isTriggering || activeJob !== null}
+                style={{
+                  padding: '0.55rem 0.9rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: '#475569',
+                  color: '#fff',
+                  fontWeight: 700,
+                  cursor: isTriggering || activeJob ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Run Ownership Ingest
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Freshness Contract */}
+      {freshness && (
+        <div
+          style={{
+            background: 'rgba(15, 23, 42, 0.7)',
+            borderRadius: '14px',
+            border: freshness.screener_lagging
+              ? '1px solid rgba(234, 179, 8, 0.45)'
+              : '1px solid rgba(255, 255, 255, 0.07)',
+            padding: '1.5rem 1.75rem',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '0.75rem',
+              marginBottom: '1.25rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <Clock size={20} style={{ color: getFreshnessColor(freshness.status) }} />
+              <div>
+                <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#f8fafc', margin: 0 }}>
+                  Data Freshness
+                </h2>
+                <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  Compares last completed ingestion evidence, market partitions, and screener snapshot age.
+                </p>
+              </div>
+            </div>
+            <span
+              style={{
+                padding: '0.3rem 0.75rem',
+                borderRadius: '20px',
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                textTransform: 'uppercase',
+                background: `${getFreshnessColor(freshness.status)}22`,
+                color: getFreshnessColor(freshness.status),
+                border: `1px solid ${getFreshnessColor(freshness.status)}55`,
+              }}
+            >
+              {freshnessLabel(freshness.status)}
+            </span>
+          </div>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: '1rem',
+              marginBottom: freshness.warning ? '1rem' : 0,
+            }}
+          >
+            <div
+              style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '10px',
+                padding: '1rem',
+              }}
+            >
+              <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>
+                Ingestion last success
+              </div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: '#f8fafc', marginTop: '0.35rem' }}>
+                {freshness.last_successful_ingestion.available
+                  ? formatTs(freshness.last_successful_ingestion.completed_at)
+                  : 'No completed job in this session'}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                {freshness.last_successful_ingestion.available
+                  ? `${freshness.last_successful_ingestion.job_type || 'job'} · ${freshness.last_successful_ingestion.job_id}`
+                  : freshness.last_successful_ingestion.note || 'Job registry is process-local.'}
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '10px',
+                padding: '1rem',
+              }}
+            >
+              <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>
+                Market data as-of
+              </div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: '#38bdf8', marginTop: '0.35rem' }}>
+                {freshness.market_data.as_of_date || 'No partitions'}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                stock_summary last partition
+                {freshness.ingestion_evidence_at
+                  ? ` · evidence ${formatTs(freshness.ingestion_evidence_at)}`
+                  : ''}
+              </div>
+            </div>
+
+            <div
+              style={{
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '10px',
+                padding: '1rem',
+              }}
+            >
+              <div style={{ fontSize: '0.7rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 700 }}>
+                Screener snapshot as-of
+              </div>
+              <div style={{ fontSize: '1rem', fontWeight: 700, color: '#f8fafc', marginTop: '0.35rem' }}>
+                {freshness.screener_snapshot.exists
+                  ? formatTs(
+                      freshness.screener_snapshot.content_last_updated ||
+                        freshness.screener_snapshot.modified_iso
+                    )
+                  : 'File missing'}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                {freshness.screener_snapshot.file}
+                {freshness.screener_snapshot.modified_iso
+                  ? ` · mtime ${formatTs(freshness.screener_snapshot.modified_iso)}`
+                  : ''}
+              </div>
+            </div>
+          </div>
+
+          {freshness.warning && (
+            <div
+              style={{
+                background: 'rgba(234, 179, 8, 0.1)',
+                border: '1px solid rgba(234, 179, 8, 0.35)',
+                borderRadius: '10px',
+                padding: '0.85rem 1rem',
+                color: '#fbbf24',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.5rem',
+              }}
+            >
+              <AlertTriangle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+              <span>{freshness.warning}</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 2-Column Grid: Section 1 & 2 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: '1.5rem' }}>
         {/* 1. Partitioned Timeseries Storage */}
@@ -365,7 +914,7 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {Object.entries(inv.timeseries).map(([ds, meta]) => (
+            {Object.entries(inv?.timeseries || {}).map(([ds, meta]) => (
               <div
                 key={ds}
                 style={{
@@ -421,7 +970,7 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {/* Parquet table rows */}
-            {Object.entries(inv.parquet_exports).map(([name, meta]) => (
+            {Object.entries(inv?.parquet_exports || {}).map(([name, meta]) => (
               <div
                 key={name}
                 style={{
@@ -520,15 +1069,15 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Missing Sessions</div>
-              <div style={{ fontSize: '1.2rem', fontWeight: 800, color: gaps.true_missing_trading_days_count > 0 ? '#ef4444' : '#22c55e' }}>
-                {gaps.true_missing_trading_days_count}
+              <div style={{ fontSize: '1.2rem', fontWeight: 800, color: missingCount > 0 ? '#ef4444' : '#22c55e' }}>
+                {missingCount}
               </div>
             </div>
           </div>
         </div>
 
         {/* Missing Dates Alert Box */}
-        {gaps.true_missing_trading_days_count > 0 ? (
+        {missingCount > 0 ? (
           <div
             style={{
               background: 'rgba(239, 68, 68, 0.08)',
@@ -540,10 +1089,10 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.75rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f87171', fontWeight: 700, fontSize: '0.9rem' }}>
                 <AlertTriangle size={18} />
-                <span>Detected {gaps.true_missing_trading_days_count} un-ingested trading sessions in 2026:</span>
+                <span>Detected {missingCount} un-ingested trading sessions in 2026:</span>
               </div>
               <button
-                onClick={() => handleTriggerTier(recs.tiers[0])}
+                onClick={() => handleTriggerTier(Array.isArray(recs?.tiers) ? recs.tiers[0] : undefined)}
                 disabled={isTriggering || activeJob !== null}
                 style={{
                   display: 'flex',
@@ -565,7 +1114,7 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
             </div>
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-              {gaps.true_missing_trading_days.map((date) => (
+              {missingDays.map((date) => (
                 <span
                   key={date}
                   style={{
@@ -629,7 +1178,7 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
 
         {/* 4 Tier Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
-          {recs.tiers.map((tier) => {
+          {(Array.isArray(recs?.tiers) ? recs.tiers : []).map((tier) => {
             const isSelected = selectedTier === tier.tier;
             const isRecommended = tier.tier === 2;
             const isCritical = tier.tier === 1;
@@ -673,7 +1222,7 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
                     Recommended
                   </span>
                 )}
-                {isCritical && gaps.true_missing_trading_days_count > 0 && (
+                {isCritical && missingCount > 0 && (
                   <span
                     style={{
                       position: 'absolute',
@@ -739,6 +1288,7 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
         </div>
 
         {/* Selected Tier Deep Dive & CLI Execution Box */}
+        {activeTierObj && (
         <div
           style={{
             background: 'rgba(7, 10, 19, 0.6)',
@@ -791,7 +1341,10 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
               Capabilities & Alpha Signals Unlocked
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.5rem' }}>
-              {activeTierObj.unlocked_capabilities.map((cap, idx) => (
+              {(Array.isArray(activeTierObj?.unlocked_capabilities)
+                ? activeTierObj.unlocked_capabilities
+                : []
+              ).map((cap, idx) => (
                 <div
                   key={idx}
                   style={{
@@ -815,7 +1368,10 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
               Direct Terminal CLI Execution (Strict uv syntax)
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              {activeTierObj.recommended_cli_commands.map((cmd, idx) => (
+              {(Array.isArray(activeTierObj?.recommended_cli_commands)
+                ? activeTierObj.recommended_cli_commands
+                : []
+              ).map((cmd, idx) => (
                 <div
                   key={idx}
                   style={{
@@ -864,6 +1420,7 @@ export const IngestionTab: React.FC<IngestionTabProps> = ({ lastLiveEvent }) => 
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

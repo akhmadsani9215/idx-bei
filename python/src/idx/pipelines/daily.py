@@ -96,13 +96,19 @@ def ingest_daily(date=None, client=None, export_parquet=True):
             log.error("%s ingestion failed: %s", dataset, exc)
             results[dataset] = {"status": "error", "message": str(exc)}
 
-    # Refresh dynamic USD/IDR exchange rate
+    # Refresh dynamic USD/IDR exchange rate (no hidden Yahoo unless opted in)
     try:
-        from idx.core.currency import get_usd_idr_rate
+        from idx.core.currency import resolve_usd_idr_quote
 
-        rate = get_usd_idr_rate(force_refresh=True)
-        results["usd_idr_rate"] = rate
-        log.info("Refreshed USD/IDR exchange rate: %.2f", rate)
+        quote = resolve_usd_idr_quote(force_refresh=True)
+        results["usd_idr_rate"] = quote["rate"]
+        results["usd_idr"] = quote
+        log.info(
+            "USD/IDR rate: %.2f source=%s quality=%s",
+            quote["rate"],
+            quote.get("source"),
+            quote.get("quality"),
+        )
     except Exception as exc:
         log.warning("USD/IDR rate refresh skipped: %s", exc)
 
