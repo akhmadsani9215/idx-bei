@@ -1,57 +1,1 @@
-"""Agen 7 — production data / license path regression tests."""
-
-from __future__ import annotations
-
-import inspect
-
-import pytest
-
-from idx.core.currency import fx_status, resolve_usd_idr_quote, yahoo_fx_allowed
-from idx.providers import integrations_overview
-from idx.screener import engine as screener_engine
-
-
-def test_yahoo_not_hidden_production_dependency(monkeypatch):
-    monkeypatch.delenv("RITELINSIGHT_ALLOW_YAHOO_FX", raising=False)
-    monkeypatch.delenv("RITELINSIGHT_ALLOW_OPEN_ER_API", raising=False)
-    assert yahoo_fx_allowed() is False
-    st = fx_status()
-    assert st["hidden_yahoo_production_dependency"] is False
-    assert st["yahoo_allowed"] is False
-    overview = integrations_overview()
-    assert "fx" in overview
-    assert overview["fx"]["yahoo_allowed"] is False
-
-
-def test_force_refresh_without_opt_in_uses_cache_or_default(monkeypatch, tmp_path):
-    monkeypatch.delenv("RITELINSIGHT_ALLOW_YAHOO_FX", raising=False)
-    monkeypatch.delenv("RITELINSIGHT_ALLOW_OPEN_ER_API", raising=False)
-    cache = tmp_path / "usd_idr_rate.json"
-    monkeypatch.setattr("idx.core.currency.CACHE_FILE", str(cache))
-    q = resolve_usd_idr_quote(force_refresh=True, default_rate=16111.0)
-    assert q["source"] == "default_constant"
-    assert q["rate"] == 16111.0
-    assert q["live_attempted"] is False
-
-
-def test_ownership_message_not_configured():
-    from idx.ingestion import validate_ownership_path_or_url
-
-    with pytest.raises(ValueError) as exc:
-        validate_ownership_path_or_url(None)
-    assert "KSEI OWNERSHIP SOURCE NOT CONFIGURED" in str(exc.value)
-
-
-def test_lhkpn_dir_not_shipped_with_repo():
-    from pathlib import Path
-
-    root = Path(__file__).resolve().parents[2]
-    assert not (root / "lhkpn").exists()
-
-
-def test_close_pressure_ss_not_wired_into_screener_engine():
-    """GetTradingInfoSS helper exists but is not the production screener source."""
-    src = inspect.getsource(screener_engine)
-    assert "close_pressure_data" not in src
-    assert "GetTradingInfoSS" not in src
-
+"""Agen 7 — production data / license path regression tests."""from __future__ import annotationsimport inspectimport pytestfrom idx.core.currency import fx_status, resolve_usd_idr_quote, yahoo_fx_allowedfrom idx.providers import integrations_overviewfrom idx.screener import engine as screener_enginedef test_yahoo_not_hidden_production_dependency(monkeypatch):    monkeypatch.delenv("RITELINSIGHT_ALLOW_YAHOO_FX", raising=False)    monkeypatch.delenv("RITELINSIGHT_ALLOW_OPEN_ER_API", raising=False)    assert yahoo_fx_allowed() is False    st = fx_status()    assert st["hidden_yahoo_production_dependency"] is False    assert st["yahoo_allowed"] is False    overview = integrations_overview()    assert "fx" in overview    assert overview["fx"]["yahoo_allowed"] is Falsedef test_force_refresh_without_opt_in_uses_cache_or_default(monkeypatch, tmp_path):    monkeypatch.delenv("RITELINSIGHT_ALLOW_YAHOO_FX", raising=False)    monkeypatch.delenv("RITELINSIGHT_ALLOW_OPEN_ER_API", raising=False)    cache = tmp_path / "usd_idr_rate.json"    monkeypatch.setattr("idx.core.currency.CACHE_FILE", str(cache))    q = resolve_usd_idr_quote(force_refresh=True, default_rate=16111.0)    assert q["source"] == "default_constant"    assert q["rate"] == 16111.0    assert q["live_attempted"] is Falsedef test_ownership_message_not_configured():    from idx.ingestion import validate_ownership_path_or_url    with pytest.raises(ValueError) as exc:        validate_ownership_path_or_url(None)    assert "KSEI OWNERSHIP SOURCE NOT CONFIGURED" in str(exc.value)def test_lhkpn_dir_not_shipped_with_repo():    from pathlib import Path    root = Path(__file__).resolve().parents[2]    assert not (root / "lhkpn").exists()def test_close_pressure_ss_not_wired_into_screener_engine():    """GetTradingInfoSS helper exists but is not the production screener source."""    src = inspect.getsource(screener_engine)    assert "close_pressure_data" not in src    assert "GetTradingInfoSS" not in src

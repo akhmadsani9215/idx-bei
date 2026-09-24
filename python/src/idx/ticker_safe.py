@@ -1,18 +1,1 @@
-"""Ticker / symbol sanitization for query boundaries."""
-
-from __future__ import annotations
-
-import re
-
-_TICKER_RE = re.compile(r"^[A-Z0-9]{1,10}$")
-
-
-def sanitize_ticker(raw: str | None) -> str:
-    """Uppercase alphanumeric ticker only — rejects injection payloads."""
-    if raw is None:
-        raise ValueError("ticker is required")
-    code = str(raw).upper().strip()
-    if not _TICKER_RE.match(code):
-        raise ValueError(f"invalid ticker: {raw!r}")
-    return code
-
+"""Ticker / symbol sanitization for query boundaries."""from __future__ import annotationsimport re_TICKER_RE = re.compile(r"^[A-Z0-9]{1,10}$")def sanitize_ticker(raw: str | None) -> str:    """Uppercase alphanumeric ticker only — rejects injection payloads."""    if raw is None:        raise ValueError("ticker is required")    code = str(raw).upper().strip()    if not _TICKER_RE.match(code):        raise ValueError(f"invalid ticker: {raw!r}")    return code

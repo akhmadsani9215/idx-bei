@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pandas as pd
 
 from idx.providers import MarketDataProvider
-from idx.schema_version import DATA_SCHEMA_VERSION, attach_schema
+from idx.schema_version import attach_schema
 from idx.screener.engine import evaluate_close_pressure_row, evaluate_swing_row
 from idx.screener.structure import enrich_structure
 from idx.signals import compute_technical_indicators
@@ -59,7 +59,7 @@ def build_stock_terminal(
                 "confidence": None,
                 "provider": provider,
                 "engine_version": ENGINE_VERSION,
-                "calculated_at": datetime.now(timezone.utc).isoformat(),
+                "calculated_at": datetime.now(UTC).isoformat(),
             }
         )
 
@@ -74,7 +74,9 @@ def build_stock_terminal(
         tech = tech.tail(limit).reset_index(drop=True)
 
     tech["time"] = tech["Date"].dt.strftime("%Y-%m-%d")
-    tech["open"] = tech["OpenPrice"].fillna(tech["Close"]) if "OpenPrice" in tech.columns else tech["Close"]
+    tech["open"] = (
+        tech["OpenPrice"].fillna(tech["Close"]) if "OpenPrice" in tech.columns else tech["Close"]
+    )
     tech["high"] = tech["High"].fillna(tech["Close"]) if "High" in tech.columns else tech["Close"]
     tech["low"] = tech["Low"].fillna(tech["Close"]) if "Low" in tech.columns else tech["Close"]
     tech["close"] = tech["Close"]
@@ -146,7 +148,9 @@ def build_stock_terminal(
         "foreign_buy": latest.get("ForeignBuy"),
         "foreign_sell": latest.get("ForeignSell"),
         "net": latest.get("NetForeignFlow"),
-        "status": "PARTIAL" if latest.get("ForeignBuy") is not None or latest.get("NetForeignFlow") is not None else "UNAVAILABLE",
+        "status": "PARTIAL"
+        if latest.get("ForeignBuy") is not None or latest.get("NetForeignFlow") is not None
+        else "UNAVAILABLE",
         "note": "Aggregate foreign flow — not institutional attribution.",
         "as_of": latest.get("time"),
         "source": "stock_summary",
@@ -216,6 +220,6 @@ def build_stock_terminal(
             "provider": provider,
             "realtime": "NOT_CONFIGURED",
             "engine_version": ENGINE_VERSION,
-            "calculated_at": datetime.now(timezone.utc).isoformat(),
+            "calculated_at": datetime.now(UTC).isoformat(),
         }
     )

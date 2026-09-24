@@ -6,7 +6,7 @@ No secrets in logs or response payloads.
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from idx.auth_session import auth_status
@@ -14,12 +14,11 @@ from idx.cors_config import resolve_cors_origins
 from idx.providers import integrations_overview
 from idx.schema_version import DATA_SCHEMA_VERSION
 
-
 ENGINE_VERSION = "ops-1.0"
 
 
 def _utc() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _env_mode() -> str:
@@ -63,18 +62,32 @@ def ops_status() -> dict[str, Any]:
     # Memory / process hints — bounded, no PII
     mem_warning = None
     try:
-        import resource  # type: ignore
+        import importlib
 
+        resource = importlib.import_module("resource")  # POSIX only; absent on Windows
         usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
         # Linux: KB; macOS: bytes — report raw with unit note
         mem_warning = {"ru_maxrss": usage, "unit": "platform_dependent"}
     except Exception:
         mem_warning = None
 
+    from idx.ingestion import list_recent_jobs, running_job
+    from idx.security import security_status
+
+    active = running_job()
     return {
         "env": mode,
         "ready": readiness(),
         "schema_version": DATA_SCHEMA_VERSION,
+        "security": security_status(),
+        "jobs": {
+            "running": active.get("job_id") if active else None,
+            "recent": [
+                {k: j.get(k) for k in ("job_id", "type", "status", "created_at", "duration_s")}
+                for j in list_recent_jobs(5)
+            ],
+            "concurrency": "serialized — one ingestion job at a time (409 otherwise)",
+        },
         "auth": {
             "status": auth.get("status"),
             "mode": auth.get("mode"),

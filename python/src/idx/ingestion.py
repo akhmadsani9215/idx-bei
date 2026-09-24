@@ -440,6 +440,20 @@ def calculate_backfill_recommendations(
 
 # Track active and recent background ingestion jobs
 _INGESTION_JOBS: dict[str, dict[str, Any]] = {}
+_JOB_TASKS: dict[str, Any] = {}
+MAX_JOB_HISTORY = 50
+JOB_HISTORY_FILE = os.path.join(DATA_DIR, ".ingestion_job_history.json")
+_PERSISTED_JOB_FIELDS = (
+    "job_id",
+    "type",
+    "params",
+    "status",
+    "progress_pct",
+    "message",
+    "created_at",
+    "completed_at",
+    "duration_s",
+)
 _LAST_SYNC_ALL: dict[str, Any] | None = None
 _LAST_HISTORICAL_RUN: dict[str, Any] | None = None
 _LAST_OWNERSHIP_RUN: dict[str, Any] | None = None
@@ -568,9 +582,7 @@ def build_freshness_contract(
         "completed_at": last_job.get("completed_at") if last_job else None,
         "source": "in_memory_job_registry" if last_job else None,
         "note": (
-            None
-            if last_job
-            else "No completed ingestion job recorded in this server process."
+            None if last_job else "No completed ingestion job recorded in this server process."
         ),
     }
 
@@ -622,7 +634,9 @@ def build_freshness_contract(
 
     evidence_candidates: list[tuple[datetime.datetime, str]] = []
     job_ts = _parse_flexible_timestamp(
-        last_successful_ingestion["completed_at"] if last_successful_ingestion["available"] else None
+        last_successful_ingestion["completed_at"]
+        if last_successful_ingestion["available"]
+        else None
     )
     if job_ts is not None:
         evidence_candidates.append((job_ts, "last_successful_job.completed_at"))
@@ -743,17 +757,91 @@ def get_full_ingestion_status(base_dir: str | None = None) -> dict[str, Any]:
 
 
 def get_job_status(job_id: str) -> dict[str, Any] | None:
-    """Return status of a specific ingestion task."""
-    return _INGESTION_JOBS.get(job_id)
+    """Return status of a specific ingestion task (in-memory, else persisted history)."""
+    job = _INGESTION_JOBS.get(job_id)
+    if job is not None:
+        return job
+    return next((j for j in load_job_history() if j.get("job_id") == job_id), None)
 
 
 def list_recent_jobs(limit: int = 10) -> list[dict[str, Any]]:
-    """List recent ingestion background tasks."""
-    return sorted(
-        _INGESTION_JOBS.values(),
+    """List recent ingestion background tasks (this process + persisted history)."""
+    merged = {j["job_id"]: j for j in load_job_history() if j.get("job_id")}
+    merged.update(_INGESTION_JOBS)
+    return sorted(merged.values(), key=lambda j: j.get("created_at", ""), reverse=True)[:limit]
+
+
+def register_job_task(job_id: str, task: Any) -> None:
+    """Associate an API-scheduled asyncio task with its job record (liveness checks)."""
+    _JOB_TASKS[job_id] = task
+
+
+def _task_alive(job_id: str) -> bool:
+    task = _JOB_TASKS.get(job_id)
+    if task is None:
+        return True  # inline/unknown runner — treat as running
+    try:
+        return not task.done() and not task.get_loop().is_closed()
+    except RuntimeError:
+        return False
+
+
+def running_job() -> dict[str, Any] | None:
+    """The in-process ingestion job still running, if any (jobs share data files).
+
+    A 'running' record whose task died with its event loop is marked 'interrupted'.
+    """
+    for job in _INGESTION_JOBS.values():
+        if job.get("status") != "running":
+            _JOB_TASKS.pop(job["job_id"], None)
+            continue
+        if _task_alive(job["job_id"]):
+            return job
+        job["status"] = "interrupted"
+        job["message"] = "Task ended without completing (event loop closed)."
+        _JOB_TASKS.pop(job["job_id"], None)
+        _persist_job(job)
+    return None
+
+
+def load_job_history() -> list[dict[str, Any]]:
+    """Persisted finished jobs; a 'running' record from a dead process becomes 'interrupted'."""
+    data = load_json(JOB_HISTORY_FILE) if os.path.exists(JOB_HISTORY_FILE) else None
+    if not isinstance(data, list):
+        return []
+    out = []
+    for rec in data:
+        if not isinstance(rec, dict):
+            continue
+        if rec.get("status") == "running" and rec.get("job_id") not in _INGESTION_JOBS:
+            rec = {**rec, "status": "interrupted", "message": "Process ended before completion."}
+        out.append(rec)
+    return out
+
+
+def _persist_job(record: dict[str, Any]) -> None:
+    """Keep the last ``MAX_JOB_HISTORY`` job records on disk (atomic replace)."""
+    import json
+
+    history = [j for j in load_job_history() if j.get("job_id") != record.get("job_id")]
+    slim = {k: record.get(k) for k in _PERSISTED_JOB_FIELDS}
+    history = (history + [slim])[-MAX_JOB_HISTORY:]
+    tmp = f"{JOB_HISTORY_FILE}.tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(history, fh, default=str)
+        os.replace(tmp, JOB_HISTORY_FILE)
+    except OSError as exc:
+        log.warning("Could not persist job history: %s", exc)
+
+
+def _prune_jobs() -> None:
+    finished = sorted(
+        (j for j in _INGESTION_JOBS.values() if j.get("status") != "running"),
         key=lambda j: j.get("created_at", ""),
-        reverse=True,
-    )[:limit]
+    )
+    for job in finished[: max(0, len(finished) - MAX_JOB_HISTORY)]:
+        _INGESTION_JOBS.pop(job["job_id"], None)
 
 
 def _now_iso() -> str:
@@ -779,9 +867,7 @@ def _pipeline_shell(meta: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def normalize_backfill_date_range(
-    start_date: str | None, end_date: str | None
-) -> tuple[str, str]:
+def normalize_backfill_date_range(start_date: str | None, end_date: str | None) -> tuple[str, str]:
     """Normalize and validate an explicit historical backfill range.
 
     Accepts ``YYYYMMDD`` or ``YYYY-MM-DD``. Returns ``(YYYYMMDD, YYYYMMDD)``.
@@ -800,9 +886,7 @@ def normalize_backfill_date_range(
             raise ValueError(f"{label} is empty")
         compact = text.replace("-", "")
         if len(compact) != 8 or not compact.isdigit():
-            raise ValueError(
-                f"{label} must be YYYYMMDD or YYYY-MM-DD (got {raw!r})"
-            )
+            raise ValueError(f"{label} must be YYYYMMDD or YYYY-MM-DD (got {raw!r})")
         try:
             return datetime.date(int(compact[:4]), int(compact[4:6]), int(compact[6:8]))
         except ValueError as exc:
@@ -892,9 +976,7 @@ def get_orchestration_status() -> dict[str, Any]:
             row["status"] = "UNAVAILABLE"
         elif meta["id"] == "historical":
             row["status"] = "IDLE"
-            row["warnings"] = [
-                "Manual backfill requires date range — not auto-run by Sync All."
-            ]
+            row["warnings"] = ["Manual backfill requires date range — not auto-run by Sync All."]
             if isinstance(_LAST_HISTORICAL_RUN, dict):
                 for key in (
                     "status",
@@ -1014,9 +1096,7 @@ def _status_from_ingest_dataset(result: Any) -> tuple[str, int | None, list[str]
 
 def _overall_from_pipelines(pipelines: list[dict[str, Any]]) -> str:
     """SUCCESS / PARTIAL / FAILED from runnable outcomes (UNAVAILABLE ignored)."""
-    runnable = [
-        p for p in pipelines if p.get("status") in ("SUCCESS", "PARTIAL", "FAILED")
-    ]
+    runnable = [p for p in pipelines if p.get("status") in ("SUCCESS", "PARTIAL", "FAILED")]
     if not runnable:
         return "PARTIAL"
     statuses = {p.get("status") for p in runnable}
@@ -1384,9 +1464,13 @@ async def run_async_ingestion_job(
         "message": "Starting ingestion task...",
         "created_at": datetime.datetime.now().isoformat(),
         "completed_at": None,
+        "duration_s": None,
         "results": None,
     }
     _INGESTION_JOBS[job_id] = job_record
+    _prune_jobs()
+    _persist_job(job_record)
+    started = datetime.datetime.now()
 
     async def _notify(progress: int, msg: str):
         job_record["progress_pct"] = progress
@@ -1463,15 +1547,15 @@ async def run_async_ingestion_job(
             # Run blocking ingest_daily in threadpool
             date_arg = params.get("date")
             eod_res = await asyncio.to_thread(ingest_daily, date=date_arg)
-            results: dict[str, Any] = dict(eod_res) if isinstance(eod_res, dict) else {"ingestion": eod_res}
+            results: dict[str, Any] = (
+                dict(eod_res) if isinstance(eod_res, dict) else {"ingestion": eod_res}
+            )
 
             await _notify(85, "Refreshing screener snapshot...")
             try:
                 screener_res = await asyncio.to_thread(refresh_screener_snapshot)
                 results["screener_refresh"] = screener_res
-                completion_message = (
-                    "Daily completed successfully; screener snapshot refreshed."
-                )
+                completion_message = "Daily completed successfully; screener snapshot refreshed."
             except Exception as screener_exc:
                 # EOD ingestion already succeeded — do not fail the overall job.
                 log.error(
@@ -1483,9 +1567,7 @@ async def run_async_ingestion_job(
                     "status": "failed",
                     "error": str(screener_exc),
                 }
-                completion_message = (
-                    "Daily completed successfully; screener refresh failed."
-                )
+                completion_message = "Daily completed successfully; screener refresh failed."
 
             job_record["results"] = results
 
@@ -1562,7 +1644,14 @@ async def run_async_ingestion_job(
                 if res.get("status") == "error" or res.get("error"):
                     return True
                 err_n = res.get("errors")
-                return isinstance(err_n, (int, float)) and int(err_n) > 0 and _rec(res) == 0 and int(res.get("dates_fetched") or res.get("fetched_days") or 0) == 0 and int(res.get("missing_days") or 1) > 0 and int(err_n) >= int(res.get("missing_days") or err_n)
+                return (
+                    isinstance(err_n, (int, float))
+                    and int(err_n) > 0
+                    and _rec(res) == 0
+                    and int(res.get("dates_fetched") or res.get("fetched_days") or 0) == 0
+                    and int(res.get("missing_days") or 1) > 0
+                    and int(err_n) >= int(res.get("missing_days") or err_n)
+                )
 
             parts = {
                 "stock_summary": res_stock,
@@ -1580,9 +1669,7 @@ async def run_async_ingestion_job(
                 hist_status = "FAILED"
             elif fail_flags:
                 hist_status = "PARTIAL"
-                hist_warnings.append(
-                    f"Independent dataset failure(s): {', '.join(fail_flags)}"
-                )
+                hist_warnings.append(f"Independent dataset failure(s): {', '.join(fail_flags)}")
             else:
                 hist_status = "SUCCESS"
 
@@ -1660,7 +1747,7 @@ async def run_async_ingestion_job(
             global _LAST_OWNERSHIP_RUN
             own_started = _now_iso()
             source = validate_ownership_path_or_url(params.get("path_or_url"))
-            await _notify(30, f"Ingesting KSEI ownership from provided source...")
+            await _notify(30, "Ingesting KSEI ownership from provided source...")
 
             def _run_ownership():
                 from idx.core.ownership import ingest_ksei_ownership
@@ -1791,4 +1878,6 @@ async def run_async_ingestion_job(
             except Exception:
                 pass
 
+    job_record["duration_s"] = round((datetime.datetime.now() - started).total_seconds(), 1)
+    _persist_job(job_record)
     return job_record

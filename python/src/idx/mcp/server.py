@@ -263,6 +263,94 @@ TOOLS = [
             "required": ["strategy"],
         },
     },
+    {
+        "name": "alpha_broker_summary",
+        "description": (
+            "Fetch broker buy/sell summary from Alpha Index API "
+            "(GET /stocks/broker-summary). External source — does not overwrite local Parquet. "
+            "Requires ALPHA_INDEX_API_KEY."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "ticker": {
+                    "type": "string",
+                    "description": "Stock ticker, e.g. BBCA",
+                },
+                "from": {
+                    "type": "string",
+                    "description": "Start date YYYY-MM-DD",
+                },
+                "to": {
+                    "type": "string",
+                    "description": "End date YYYY-MM-DD",
+                },
+                "investor": {
+                    "type": "string",
+                    "description": "all | f | d | or (default all)",
+                },
+                "market": {
+                    "type": "string",
+                    "description": "RG | NG | ALL (default RG)",
+                },
+                "row_limit": {
+                    "type": "integer",
+                    "description": "Max broker rows to return (default 50)",
+                },
+            },
+            "required": ["ticker", "from", "to"],
+        },
+    },
+    {
+        "name": "alpha_stock_history",
+        "description": (
+            "Fetch daily OHLCV from Alpha Index API (GET /stocks/ohlcv). "
+            "Unadjusted as-traded bars. External source — does not overwrite local data. "
+            "Requires ALPHA_INDEX_API_KEY."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "ticker": {
+                    "type": "string",
+                    "description": "Stock ticker, e.g. BBCA",
+                },
+                "from": {
+                    "type": "string",
+                    "description": "Start date YYYY-MM-DD",
+                },
+                "to": {
+                    "type": "string",
+                    "description": "End date YYYY-MM-DD",
+                },
+                "row_limit": {
+                    "type": "integer",
+                    "description": "Max bars to return (default 120)",
+                },
+            },
+            "required": ["ticker", "from", "to"],
+        },
+    },
+    {
+        "name": "alpha_foreign_flow",
+        "description": (
+            "Fetch aggregated foreign buy/sell/net from Alpha Index API "
+            "(GET /foreign-flow). External source. Requires ALPHA_INDEX_API_KEY."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "ticker": {"type": "string"},
+                "from": {"type": "string", "description": "YYYY-MM-DD"},
+                "to": {"type": "string", "description": "YYYY-MM-DD"},
+                "market": {
+                    "type": "string",
+                    "description": "RG | NG | ALL (default ALL)",
+                },
+            },
+            "required": ["ticker", "from", "to"],
+        },
+    },
 ]
 
 
@@ -539,6 +627,59 @@ def handle_tool_call(name, args):
                 default=str,
             )
 
+        elif name == "alpha_broker_summary":
+            from idx.alpha_index import AlphaIndexError, broker_summary
+
+            try:
+                result = broker_summary(
+                    ticker=str(args.get("ticker") or ""),
+                    date_from=str(args.get("from") or ""),
+                    date_to=str(args.get("to") or ""),
+                    investor=str(args.get("investor") or "all"),
+                    market=str(args.get("market") or "RG"),
+                    row_limit=int(args.get("row_limit") or 50),
+                )
+                return json.dumps(result, indent=2, default=str)
+            except AlphaIndexError as exc:
+                return json.dumps(
+                    {"success": False, "error": str(exc), "status": exc.status},
+                    indent=2,
+                )
+
+        elif name == "alpha_stock_history":
+            from idx.alpha_index import AlphaIndexError, stock_ohlcv
+
+            try:
+                result = stock_ohlcv(
+                    ticker=str(args.get("ticker") or ""),
+                    date_from=str(args.get("from") or ""),
+                    date_to=str(args.get("to") or ""),
+                    row_limit=int(args.get("row_limit") or 120),
+                )
+                return json.dumps(result, indent=2, default=str)
+            except AlphaIndexError as exc:
+                return json.dumps(
+                    {"success": False, "error": str(exc), "status": exc.status},
+                    indent=2,
+                )
+
+        elif name == "alpha_foreign_flow":
+            from idx.alpha_index import AlphaIndexError, foreign_flow
+
+            try:
+                result = foreign_flow(
+                    ticker=str(args.get("ticker") or ""),
+                    date_from=str(args.get("from") or ""),
+                    date_to=str(args.get("to") or ""),
+                    market=str(args.get("market") or "ALL"),
+                )
+                return json.dumps(result, indent=2, default=str)
+            except AlphaIndexError as exc:
+                return json.dumps(
+                    {"success": False, "error": str(exc), "status": exc.status},
+                    indent=2,
+                )
+
         else:
             return f"Unknown tool '{name}'."
 
@@ -565,7 +706,7 @@ def run_mcp_server():
                     "id": req_id,
                     "result": {
                         "protocolVersion": "2024-11-05",
-                        "serverInfo": {"name": "idx-bei-mcp", "version": "0.2.0"},
+                        "serverInfo": {"name": "idx-bei-mcp", "version": "0.3.0"},
                         "capabilities": {"tools": {}},
                     },
                 }

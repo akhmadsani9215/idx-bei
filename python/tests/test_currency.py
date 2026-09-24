@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from idx.core.currency import get_usd_idr_rate, resolve_usd_idr_quote, fx_status
+from idx.core.currency import fx_status, get_usd_idr_rate, resolve_usd_idr_quote
 
 
 class TestCurrencyEngine(unittest.TestCase):

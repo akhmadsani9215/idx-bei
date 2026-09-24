@@ -460,7 +460,7 @@ def export_corporate_actions(source=None, output=None):
 # ── Export All ────────────────────────────────────────────────────────────────
 
 
-def export_all():
+def export_all(incremental: bool = False):
     """Runs all parquet exports. Returns summary dict."""
     results = {}
 
@@ -472,7 +472,11 @@ def export_all():
         ("corporate_actions", export_corporate_actions),
     ]:
         try:
-            result = fn()
+            # Snapshot JSON exporters do not take incremental=
+            if name in ("financial_ratios", "corporate_actions"):
+                result = fn()
+            else:
+                result = fn(incremental=incremental)
             results[name] = result if result else {"status": "no_data"}
         except Exception as exc:
             log.error("Failed to export %s: %s", name, exc)

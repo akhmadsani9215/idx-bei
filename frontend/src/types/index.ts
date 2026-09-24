@@ -319,7 +319,18 @@ export interface StreamEvent {
 }
 
 export interface BacktestParams {
-  strategy: 'foreign_flow' | 'bandarmology' | 'stealth_accumulation' | 'sharia_value' | 'composite_alpha' | 'dividend_arbitrage';
+  strategy:
+    | 'foreign_flow'
+    | 'bandarmology'
+    | 'stealth_accumulation'
+    | 'sharia_value'
+    | 'composite_alpha'
+    | 'dividend_arbitrage'
+    | 'momentum'
+    | 'breakout'
+    | 'pullback'
+    | 'mean_reversion'
+    | 'volume_expansion';
   holding_days: number;
   top_n: number;
   min_turnover_rp: number;
@@ -328,6 +339,62 @@ export interface BacktestParams {
   stop_loss_pct?: number;
   take_profit_pct?: number;
   position_sizing?: 'equal_weight' | 'volatility_parity';
+}
+
+export interface StrategyResearchValidation {
+  status: string;
+  by_horizon?: Record<string, string>;
+  report?: string | null;
+  study_generated_at?: string | null;
+  production_status?: null;
+  reason?: string;
+}
+
+export interface StrategyCatalogEntry {
+  id: string;
+  engine?: string | null;
+  status: string;
+  oos: string;
+  notes?: string;
+  research_validation: StrategyResearchValidation;
+  profitable_claim: boolean;
+}
+
+export interface StrategyCatalogResponse {
+  strategies: StrategyCatalogEntry[];
+  engine_version: string;
+  DATA_SCHEMA_VERSION?: string;
+  notes?: string[];
+  calculated_at?: string;
+}
+
+export interface StrategyResearchTrial {
+  strategy_id?: string;
+  family?: string;
+  horizon?: string;
+  holding_days?: number;
+  verdict?: string;
+  verdict_reasons?: string[];
+  robustness_status?: string | null;
+  eligibility_status?: string | null;
+  oos?: {
+    status?: string;
+    sample_count?: number | null;
+    gross_expectancy_pct?: number | null;
+    illustrative_net_expectancy_pct?: number | null;
+  };
+}
+
+export interface StrategyResearchResponse {
+  status: string;
+  reason?: string;
+  generated_at?: string | null;
+  verdict_counts?: Record<string, number>;
+  protocol?: Record<string, unknown>;
+  survivorship?: { status?: string; observations?: Record<string, unknown> };
+  trials?: StrategyResearchTrial[];
+  not_evaluated?: unknown[];
+  production_buy_emitted?: boolean;
 }
 
 export interface BacktestMetrics {
@@ -523,6 +590,8 @@ export interface ScreenerResult {
   why_signal?: string | null;
   status?: string | null;
   engine_version?: string | null;
+  production_eligibility?: string | null;
+  production_eligibility_reason?: string | null;
 }
 
 export interface ScreenerResponse {
@@ -537,6 +606,8 @@ export interface ScreenerResponse {
     cursor?: number;
     next_cursor?: number | null;
     engine_version?: string;
+    production_eligibility?: string;
+    production_eligibility_reason?: string;
     limitations?: string[];
     [key: string]: unknown;
   };

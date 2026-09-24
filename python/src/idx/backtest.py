@@ -9,6 +9,7 @@ For a decision made on ``entry_date``, every feature used for that decision must
 use only information available on or before ``entry_date``:
 
 * OHLCV / foreign flow / technicals: ``history_slice = stock[Date <= entry_date]``
+  (bars before ``start_date`` are used for warm-up; trades stay inside the window)
 * Fundamental ratios (sharia_value, composite_alpha): ``as_of=entry_date``
   (``fsDate <= entry_date``; undated filings excluded)
 * Never fall back to a live dashboard snapshot or post-entry bars for ranking
@@ -22,17 +23,39 @@ Entry / exit semantics (``run_backtest``, non-dividend strategies)
   ticker, last available Close on or before the planned exit within the window
 * Optional stop-loss / take-profit: after entry, checked on subsequent session
   Closes; fill approximated at the stop/target return level (not the raw Close);
-  ``ExitDate`` is the session where the stop/target first triggers
+  ``ExitDate`` is the session where the stop/target first triggers. A Close that
+  gaps through the stop is still booked at the stop level (optimistic fill).
 * Fees / slippage / position sizing: not implemented
-* Price basis: raw IDX ``Close`` from stock_summary (not corporate-action adjusted)
+* Price basis (default): OHLC forward-adjusted with the exchange reference price
+  (``idx.core.price_adjustment``; causal — only events on/before each bar).
+  ``adjust_prices=False`` reproduces raw unadjusted Close. Entry/Exit prices in the
+  ledger are therefore in each ticker's first-bar share basis.
+* Technical strategies compute trailing indicators once over the window; each
+  row only uses bars on or before its own date, so slicing at ``entry_date`` is
+  equivalent to recomputing on ``history_slice``.
+* Data gaps (> ``MAX_SESSION_GAP_DAYS`` between dataset sessions) split history
+  into segments; features/history never cross a gap and rebalances whose exit
+  would cross one are skipped (``data_gap_rebalances_skipped``).
+* Corporate-action windows (default): a trade is dropped if a price-distorting
+  event falls after entry and on or before exit (``ca_event_trades_excluded``).
+  Events come from the CA table and from exchange-reference factor detections.
+* Signal and fill share the entry-session Close: executable only via a
+  near-close / closing-auction order (close-to-close assumption).
 """
 
 import os
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
 from idx.core.currency import resolve_usd_idr_quote
+from idx.core.price_adjustment import (
+    PRICE_BASIS,
+    PRICE_DISTORTING_ACTION_TYPES,
+    forward_adjust,
+    reference_factors,
+)
 from idx.core.utils import DATA_DIR, get_logger, load_json
 from idx.signals import (
     composite_alpha_ranking,
@@ -52,10 +75,126 @@ SUPPORTED_STRATEGIES = frozenset(
         "sharia_value",
         "composite_alpha",
         "dividend_arbitrage",
+        "momentum",
+        "breakout",
+        "pullback",
+        "mean_reversion",
+        "volume_expansion",
     }
 )
 
-_EMPTY_METRICS = {
+# Single interpretable rule per research family (Signal Discovery Stage-1); no tuning.
+TECHNICAL_RULES: dict[str, str] = {
+    "momentum": "liquid; rank by trailing 20-session Close return desc",
+    "breakout": "liquid; Close > prior 20-session High and VolRatio20 >= 1.5; rank VolRatio20 desc",
+    "pullback": "liquid; Close > EMA50 and EMA20 > EMA50 and RSI14 <= 40; rank RSI14 asc",
+    "mean_reversion": "liquid; Close below lower Bollinger band (PctB < 0); rank PctB asc",
+    "volume_expansion": "liquid; bullish TrendRegime and VolRatio20 >= 2.0; rank VolRatio20 desc",
+}
+TECHNICAL_STRATEGIES = frozenset(TECHNICAL_RULES) | {"bandarmology"}
+_BULLISH = ("STRONG_BULLISH", "BULLISH")
+
+# Consecutive dataset sessions further apart than this are a data gap (IDX holidays
+# are shorter). Features, history and trades never span a gap.
+MAX_SESSION_GAP_DAYS = 14
+
+
+_TECH_CACHE: dict[str, pd.DataFrame] = {}
+_TECH_CACHE_MAX = 2
+_TECH_HASH_COLUMNS = ("Date", "StockCode", "Close", "High", "Low", "OpenPrice", "Volume", "Value")
+
+
+def _segmented_technical_features(full_df: pd.DataFrame) -> pd.DataFrame:
+    """Per-segment trailing features over the full frame, cached by content hash.
+
+    Rows at date d depend only on bars <= d in the same segment, so callers may
+    slice the result at any end_date without changing earlier values.
+    """
+    cols = [c for c in _TECH_HASH_COLUMNS if c in full_df.columns]
+    key = str(pd.util.hash_pandas_object(full_df[cols], index=False).sum())
+    cached = _TECH_CACHE.get(key)
+    if cached is not None:
+        return cached
+    parts = [_technical_features(g) for _, g in full_df.groupby("_Segment", sort=True)]
+    parts = [p for p in parts if not p.empty]
+    tech = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
+    if len(_TECH_CACHE) >= _TECH_CACHE_MAX:
+        _TECH_CACHE.pop(next(iter(_TECH_CACHE)))
+    _TECH_CACHE[key] = tech
+    return tech
+
+
+def _segment_map(dates: np.ndarray) -> dict[pd.Timestamp, int]:
+    out: dict[pd.Timestamp, int] = {}
+    seg, prev = 0, None
+    for d in dates:
+        ts = pd.Timestamp(d)
+        if prev is not None and (ts - prev).days > MAX_SESSION_GAP_DAYS:
+            seg += 1
+        out[ts] = seg
+        prev = ts
+    return out
+
+
+def _technical_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Trailing per-ticker features; each row uses only bars on or before its date."""
+    tech = compute_technical_indicators(df)
+    if tech.empty:
+        return tech
+    g = tech.groupby("StockCode", sort=False)
+    tech["Ret20"] = tech["Close"] / g["Close"].shift(20) - 1.0
+    tech["PriorHigh20"] = g["High"].transform(
+        lambda s: s.shift(1).rolling(20, min_periods=20).max()
+    )
+    value = pd.to_numeric(tech["Value"], errors="coerce") if "Value" in tech.columns else None
+    tech["AvgValue20"] = (
+        value.groupby(tech["StockCode"]).transform(lambda s: s.rolling(20, min_periods=5).mean())
+        if value is not None
+        else np.nan
+    )
+    return tech
+
+
+def _select_technical(
+    strategy: str, day: pd.DataFrame | None, *, top_n: int, min_turnover_rp: float
+) -> list[str]:
+    if day is None or day.empty:
+        return []
+    if strategy == "bandarmology":
+        picks = day[day["TrendRegime"].isin(_BULLISH)]
+        sort_col, ascending = "VolRatio20", False
+    else:
+        liquid = day[day["AvgValue20"] >= min_turnover_rp]
+        if strategy == "momentum":
+            picks = liquid[liquid["Ret20"].notna()]
+            sort_col, ascending = "Ret20", False
+        elif strategy == "breakout":
+            picks = liquid[
+                (liquid["Close"] > liquid["PriorHigh20"]) & (liquid["VolRatio20"] >= 1.5)
+            ]
+            sort_col, ascending = "VolRatio20", False
+        elif strategy == "pullback":
+            picks = liquid[
+                (liquid["Close"] > liquid["EMA50"])
+                & (liquid["EMA20"] > liquid["EMA50"])
+                & (liquid["RSI14"] <= 40)
+            ]
+            sort_col, ascending = "RSI14", True
+        elif strategy == "mean_reversion":
+            picks = liquid[liquid["BB_PctB"] < 0]
+            sort_col, ascending = "BB_PctB", True
+        else:  # volume_expansion
+            picks = liquid[liquid["TrendRegime"].isin(_BULLISH) & (liquid["VolRatio20"] >= 2.0)]
+            sort_col, ascending = "VolRatio20", False
+    if picks.empty:
+        return []
+    ordered = picks.sort_values(
+        [sort_col, "StockCode"], ascending=[ascending, True], kind="mergesort"
+    )
+    return ordered.head(top_n)["StockCode"].tolist()
+
+
+_EMPTY_METRICS: dict[str, Any] = {
     "total_return_pct": 0.0,
     # True CAGR is unavailable without an unambiguous calendar span; never mirror total return.
     "cagr_pct": None,
@@ -69,6 +208,60 @@ _EMPTY_METRICS = {
     "benchmark_return_pct": None,
     "alpha_pct": None,
 }
+
+# Per-trade outcome summaries; null when there are no trades or the rule was not configured.
+_TRADE_OUTCOME_KEYS: tuple[str, ...] = (
+    "expectancy_pct",
+    "median_mfe_pct",
+    "median_mae_pct",
+    "tp_hit_rate_pct",
+    "cl_hit_rate_pct",
+    "median_holding_sessions",
+    "excursion_basis",
+)
+_EMPTY_METRICS.update({k: None for k in _TRADE_OUTCOME_KEYS})
+
+
+def _trade_outcome_metrics(
+    trades_df: pd.DataFrame,
+    *,
+    stop_loss_pct: float | None,
+    take_profit_pct: float | None,
+) -> dict[str, object]:
+    """Summaries of realised per-trade paths (entry→exit, gross, unadjusted Close basis)."""
+    out: dict[str, object] = {k: None for k in _TRADE_OUTCOME_KEYS}
+    if trades_df is None or len(trades_df) == 0:
+        return out
+    n = len(trades_df)
+    out["expectancy_pct"] = round(float(trades_df["Return"].mean()) * 100.0, 4)
+    out["median_mfe_pct"] = round(float(trades_df["MFEPct"].median()), 4)
+    out["median_mae_pct"] = round(float(trades_df["MAEPct"].median()), 4)
+    out["median_holding_sessions"] = float(trades_df["HoldingSessions"].median())
+    reasons = trades_df["ExitReason"]
+    if take_profit_pct:
+        out["tp_hit_rate_pct"] = round(float((reasons == "TAKE_PROFIT").sum()) / n * 100.0, 2)
+    if stop_loss_pct:
+        out["cl_hit_rate_pct"] = round(float((reasons == "STOP_LOSS").sum()) / n * 100.0, 2)
+    bases = set(trades_df["ExcursionBasis"].unique())
+    out["excursion_basis"] = bases.pop() if len(bases) == 1 else "MIXED"
+    return out
+
+
+def _excursions(path: pd.DataFrame, entry_price: float) -> tuple[float, float, str]:
+    """MFE/MAE (%) over post-entry sessions up to exit; High/Low when present else Close."""
+    if path.empty:
+        return 0.0, 0.0, "NO_PATH"
+    has_hl = {"High", "Low"} <= set(path.columns)
+    highs = pd.to_numeric(path["High"], errors="coerce") if has_hl else None
+    lows = pd.to_numeric(path["Low"], errors="coerce") if has_hl else None
+    if highs is not None and lows is not None and highs.notna().all() and lows.notna().all():
+        hi, lo, basis = float(highs.max()), float(lows.min()), "HIGH_LOW"
+    else:
+        closes = pd.to_numeric(path["Close"], errors="coerce")
+        hi, lo, basis = float(closes.max()), float(closes.min()), "CLOSE"
+    mfe = max(hi / entry_price - 1.0, 0.0) * 100.0
+    mae = min(lo / entry_price - 1.0, 0.0) * 100.0
+    return round(mfe, 4), round(mae, 4), basis
 
 
 def _empty_result(strategy: str, holding_days: int) -> tuple[dict, pd.DataFrame]:
@@ -96,6 +289,54 @@ def _load_data():
     actions = pd.read_parquet(actions_path) if os.path.exists(actions_path) else pd.DataFrame()
     broker = pd.read_parquet(broker_path) if os.path.exists(broker_path) else pd.DataFrame()
     return stock, ratios, actions, broker
+
+
+# If more than this share of a ticker's sessions look like reference-price events,
+# ``Previous`` is not an official exchange reference (synthetic/garbage) — ignore it.
+# One genuine split in a short fixture is well below this; day-by-day Close-as-Previous is not.
+_REFERENCE_EVENT_DENSITY_CAP = 0.25
+
+
+def _ca_event_index(
+    stock_df: pd.DataFrame, actions_df: pd.DataFrame | None
+) -> dict[str, np.ndarray]:
+    """Ticker → sorted event timestamps (exchange-reference + distorting CA table)."""
+    buckets: dict[str, list[pd.Timestamp]] = {}
+    if {"Date", "StockCode", "Close", "Previous"} <= set(stock_df.columns):
+        factors = reference_factors(stock_df)
+        ev = stock_df.loc[factors != 1.0, ["StockCode", "Date"]]
+        sessions = stock_df.groupby(stock_df["StockCode"].astype(str))["Date"].nunique()
+        raw: dict[str, list[pd.Timestamp]] = {}
+        for code, ts in zip(ev["StockCode"].astype(str), pd.to_datetime(ev["Date"]), strict=True):
+            if pd.notna(ts):
+                raw.setdefault(code, []).append(pd.Timestamp(ts))
+        for code, dates in raw.items():
+            n = int(sessions.get(code, 0))
+            if n and len(dates) / n <= _REFERENCE_EVENT_DENSITY_CAP:
+                buckets.setdefault(code, []).extend(dates)
+    if actions_df is not None and {"KodeEmiten", "TanggalPencatatan", "caType"} <= set(
+        actions_df.columns
+    ):
+        acts = actions_df.loc[
+            actions_df["caType"].astype(str).isin(PRICE_DISTORTING_ACTION_TYPES),
+            ["KodeEmiten", "TanggalPencatatan"],
+        ]
+        for code, ts in zip(
+            acts["KodeEmiten"].astype(str),
+            pd.to_datetime(acts["TanggalPencatatan"], errors="coerce"),
+            strict=True,
+        ):
+            if pd.notna(ts):
+                buckets.setdefault(code, []).append(pd.Timestamp(ts))
+    return {k: np.unique(np.array(v, dtype="datetime64[ns]")) for k, v in buckets.items()}
+
+
+def _spans_ca(events: np.ndarray | None, entry, exit) -> bool:
+    """True if a distorting event falls after entry and on or before exit."""
+    if events is None or len(events) == 0:
+        return False
+    ev = pd.DatetimeIndex(events)
+    return bool(((ev > pd.Timestamp(entry)) & (ev <= pd.Timestamp(exit))).any())
 
 
 def _pit_market_slice(df: pd.DataFrame, entry_date) -> pd.DataFrame:
@@ -447,6 +688,9 @@ def run_backtest(
     ratios_df: pd.DataFrame | None = None,
     actions_df: pd.DataFrame | None = None,
     broker_df: pd.DataFrame | None = None,
+    adjust_prices: bool = True,
+    exclude_ca_events: bool = True,
+    ca_event_index: dict[str, np.ndarray] | None = None,
 ) -> tuple[dict, pd.DataFrame]:
     """Runs a vectorized strategy backtest over historical time-series datasets.
 
@@ -461,6 +705,9 @@ def run_backtest(
         take_profit_pct: optional take profit percentage e.g. 15.0 for +15%
         position_sizing: "equal_weight" | "volatility_parity"
         stock_df, ratios_df, actions_df, broker_df: optional custom DataFrames
+        adjust_prices: forward-adjust OHLC with the exchange reference (default True)
+        exclude_ca_events: drop trades whose hold spans a price-distorting CA (default True)
+        ca_event_index: optional precomputed ticker → event dates (skips a full-frame scan)
 
     Strategy / engine separation
     ----------------------------
@@ -517,12 +764,39 @@ def run_backtest(
         log.warning("No stock summary data for backtest.")
         return _empty_result(strategy, int(holding_days))
 
-    df = stock_df.copy()
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+    full_df = stock_df.copy()
+    full_df["Date"] = pd.to_datetime(full_df["Date"], errors="coerce")
+    full_df = full_df.dropna(subset=["Date"])
+    end_ts = pd.to_datetime(end_date) if end_date else None
+    if exclude_ca_events:
+        if ca_event_index is not None:
+            ca_index = ca_event_index
+        else:
+            raw_for_ca = full_df if end_ts is None else full_df[full_df["Date"] <= end_ts]
+            ca_index = _ca_event_index(raw_for_ca, actions_df)
+    else:
+        ca_index = {}
+    already_adjusted = "AdjFactor" in full_df.columns
+    if adjust_prices and not already_adjusted:
+        full_df = forward_adjust(full_df)
+    full_seg_map = _segment_map(np.sort(full_df["Date"].unique()))
+    full_df["_Segment"] = full_df["Date"].map(full_seg_map)
+    # Features may warm up on bars before start_date (still <= entry_date → PIT);
+    # entries, exits and outcomes stay inside [start_date, end_date].
+    hist_df = full_df if end_ts is None else full_df[full_df["Date"] <= end_ts]
+    adjustment_count = (
+        int((hist_df["AdjFactor"] != 1.0).sum()) if "AdjFactor" in hist_df.columns else 0
+    )
+    hist_dates = np.sort(hist_df["Date"].unique())
+    seg_map = {
+        d: s for d, s in full_seg_map.items() if not end_date or d <= pd.to_datetime(end_date)
+    }
+    seg_first_pos: dict[int, int] = {}
+    for pos, d in enumerate(hist_dates):
+        seg_first_pos.setdefault(seg_map[pd.Timestamp(d)], pos)
+    df = hist_df
     if start_date:
         df = df[df["Date"] >= pd.to_datetime(start_date)]
-    if end_date:
-        df = df[df["Date"] <= pd.to_datetime(end_date)]
 
     unique_dates = sorted(df["Date"].dropna().unique())
     if len(unique_dates) <= holding_days:
@@ -541,21 +815,42 @@ def run_backtest(
     )
 
     trades = []
+    session_index = {pd.Timestamp(d): k for k, d in enumerate(unique_dates)}
+    tech_by_date: dict[pd.Timestamp, pd.DataFrame] = {}
+    tech_all = pd.DataFrame()
+    if strategy in TECHNICAL_STRATEGIES or strategy == "composite_alpha":
+        tech_all = _segmented_technical_features(full_df)
+        if not tech_all.empty and end_date:
+            tech_all = tech_all[tech_all["Date"] <= pd.to_datetime(end_date)]
+        if not tech_all.empty:
+            tech_by_date = {pd.Timestamp(d): g for d, g in tech_all.groupby("Date", sort=False)}
+    gap_skipped = 0
+    ca_skipped = 0
     # Rebalance every `holding_days` sessions
     for i in range(0, len(unique_dates) - holding_days, holding_days):
         entry_date = unique_dates[i]
         planned_exit_date = unique_dates[i + holding_days]
+        segment = seg_map[pd.Timestamp(entry_date)]
+        if seg_map[pd.Timestamp(planned_exit_date)] != segment:
+            gap_skipped += 1
+            continue
 
-        # PIT market features: never include bars after entry_date
-        history_slice = _pit_market_slice(df, entry_date)
+        # PIT market features: never include bars after entry_date or before a data gap
+        history_slice = _pit_market_slice(hist_df, entry_date)
+        history_slice = history_slice[history_slice["_Segment"] == segment]
         if history_slice.empty:
             continue
+        sessions_available = (
+            int(np.searchsorted(hist_dates, entry_date, side="right")) - seg_first_pos[segment]
+        )
 
         # Generate candidates based on strategy (PIT features only)
         selected_tickers: list[str] = []
         if strategy == "foreign_flow":
             radar = foreign_flow_radar(
-                history_slice, window_days=min(10, i + 1), min_turnover_rp=min_turnover_rp
+                history_slice,
+                window_days=min(10, sessions_available),
+                min_turnover_rp=min_turnover_rp,
             )
             if len(radar) > 0:
                 radar = radar.sort_values(
@@ -581,6 +876,9 @@ def run_backtest(
                 min_turnover_rp=min_turnover_rp,
                 top_n=top_n,
                 as_of=entry_date,
+                tech=tech_all[(tech_all["_Segment"] == segment) & (tech_all["Date"] <= entry_date)]
+                if not tech_all.empty
+                else None,
             )
             if len(alpha) > 0:
                 alpha = alpha.sort_values(
@@ -588,46 +886,13 @@ def run_backtest(
                 )
                 selected_tickers = alpha.head(top_n)["StockCode"].tolist()
 
-        elif strategy in ("bandarmology", "stealth_accumulation"):
-            from idx.signals import detect_stealth_accumulation
-
-            entry_date_str = (
-                entry_date.strftime("%Y-%m-%d")
-                if hasattr(entry_date, "strftime")
-                else str(entry_date)[:10]
-            )
-            stealth_res = detect_stealth_accumulation(
-                broker=broker_df if broker_df is not None else pd.DataFrame(),
-                stock=history_slice,
-                on_date=entry_date_str,
-                lookback_days=min(5, i + 1),
+        elif strategy in TECHNICAL_STRATEGIES:
+            selected_tickers = _select_technical(
+                strategy,
+                tech_by_date.get(pd.Timestamp(entry_date)),
+                top_n=top_n,
                 min_turnover_rp=min_turnover_rp,
             )
-            anomalies = stealth_res.get("anomalies_df", pd.DataFrame())
-            if not anomalies.empty:
-                cand = anomalies[
-                    anomalies["Signal"].isin(["STEALTH_ACCUMULATION", "MARKUP_CONFIRMATION"])
-                ]
-                if cand.empty:
-                    cand = anomalies[anomalies["Signal"] == "STEALTH_ACCUMULATION"]
-                selected_tickers = cand.head(top_n)["StockCode"].tolist() if not cand.empty else []
-
-            if not selected_tickers:
-                tech = compute_technical_indicators(history_slice)
-                if len(tech) > 0:
-                    latest_tech = tech[tech["Date"] == entry_date]
-                    bullish = latest_tech[
-                        latest_tech["TrendRegime"].isin(["STRONG_BULLISH", "BULLISH"])
-                    ]
-                    selected_tickers = (
-                        bullish.sort_values(
-                            ["VolRatio20", "StockCode"],
-                            ascending=[False, True],
-                            kind="mergesort",
-                        )
-                        .head(top_n)["StockCode"]
-                        .tolist()
-                    )
 
         if not selected_tickers:
             continue
@@ -669,6 +934,7 @@ def run_backtest(
                 continue
 
             actual_exit_date = planned_exit_date
+            exit_reason = "TIME"
             exit_rows = ticker_slice[ticker_slice["Date"] == planned_exit_date]
             if not exit_rows.empty:
                 exit_price = float(exit_rows.iloc[0]["Close"])
@@ -679,6 +945,7 @@ def run_backtest(
                     continue
                 actual_exit_date = post_entry.iloc[-1]["Date"]
                 exit_price = float(post_entry.iloc[-1]["Close"])
+                exit_reason = "TIME_LAST_AVAILABLE"
 
             ret = (exit_price - entry_price) / entry_price
 
@@ -691,15 +958,25 @@ def run_backtest(
                         ret = -(stop_loss_pct / 100.0)
                         exit_price = entry_price * (1.0 + ret)
                         actual_exit_date = session_row["Date"]
+                        exit_reason = "STOP_LOSS"
                         break
                     if take_profit_pct and curr_ret >= (take_profit_pct / 100.0):
                         ret = take_profit_pct / 100.0
                         exit_price = entry_price * (1.0 + ret)
                         actual_exit_date = session_row["Date"]
+                        exit_reason = "TAKE_PROFIT"
                         break
 
             w = weights.get(ticker, 1.0 / len(selected_tickers))
             exit_dt = pd.Timestamp(actual_exit_date)
+            if exclude_ca_events and _spans_ca(ca_index.get(ticker), entry_date, exit_dt):
+                ca_skipped += 1
+                continue
+            path = ticker_slice[
+                (ticker_slice["Date"] > entry_date) & (ticker_slice["Date"] <= exit_dt)
+            ]
+            mfe_pct, mae_pct, excursion_basis = _excursions(path, entry_price)
+            holding_sessions = session_index[exit_dt] - i
             trades.append(
                 {
                     "EntryDate": pd.Timestamp(entry_date).strftime("%Y-%m-%d"),
@@ -711,6 +988,11 @@ def run_backtest(
                     "Return": ret,
                     "Weight": round(w, 4),
                     "WeightedReturn": round(ret * w, 4),
+                    "MFEPct": mfe_pct,
+                    "MAEPct": mae_pct,
+                    "ExcursionBasis": excursion_basis,
+                    "HoldingSessions": int(holding_sessions),
+                    "ExitReason": exit_reason,
                 }
             )
 
@@ -730,8 +1012,21 @@ def run_backtest(
         }
     else:
         metrics = calculate_metrics(pd.Series(dtype=float))
+    metrics.update(
+        _trade_outcome_metrics(
+            trades_df, stop_loss_pct=stop_loss_pct, take_profit_pct=take_profit_pct
+        )
+    )
     metrics["strategy"] = strategy
     metrics["holding_days"] = holding_days
     metrics["position_sizing"] = position_sizing
+    metrics["price_basis"] = (
+        PRICE_BASIS if (adjust_prices or already_adjusted) else "RAW_UNADJUSTED_CLOSE"
+    )
+    metrics["price_adjustment_events"] = adjustment_count
+    metrics["exclude_ca_events"] = exclude_ca_events
+    metrics["ca_event_trades_excluded"] = ca_skipped
+    metrics["data_gap_segments"] = len(set(seg_map.values()))
+    metrics["data_gap_rebalances_skipped"] = gap_skipped
 
     return metrics, trades_df

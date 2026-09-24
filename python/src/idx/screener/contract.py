@@ -6,7 +6,7 @@ Compatible field names reused from existing codebase where possible.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 ENGINE_VERSION = "screener-1.0"
@@ -27,6 +27,14 @@ STATUS_INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
 STATUS_INSUFFICIENT_SAMPLE = "INSUFFICIENT_SAMPLE"
 
 TIMEFRAMES = ("close_pressure", "swing", "long_term")
+
+# No screener setup has passed OOS + walk-forward + robustness + cost + multiple-testing
+# validation (see docs/SIGNAL_DISCOVERY_STUDY.md); rows are decision support only.
+PRODUCTION_ELIGIBILITY_STATUS = "NOT_VALIDATED"
+PRODUCTION_ELIGIBILITY_REASON = (
+    "Setup rules not validated OOS/walk-forward with configured costs; survivorship "
+    "NOT_VALIDATED; historical stats are per-ticker descriptive only."
+)
 
 LIFECYCLE_STATES = (
     "DORMANT",
@@ -74,6 +82,7 @@ def empty_levels() -> dict[str, Any]:
 def empty_historical_stats() -> dict[str, Any]:
     return {
         "historical_tp_probability": None,
+        "historical_cl_probability": None,
         "median_days": None,
         "mfe": None,
         "mae": None,
@@ -96,7 +105,7 @@ def empty_lineage(
         "quality": quality,
         "data_quality": quality,
         "confidence": confidence,
-        "calculated_at": datetime.now(timezone.utc).isoformat(),
+        "calculated_at": datetime.now(UTC).isoformat(),
         "engine_version": ENGINE_VERSION,
     }
 
@@ -138,6 +147,8 @@ def base_result(
         "status": STATUS_UNAVAILABLE,
         "lineage": lineage,
         "engine_version": ENGINE_VERSION,
+        "production_eligibility": PRODUCTION_ELIGIBILITY_STATUS,
+        "production_eligibility_reason": PRODUCTION_ELIGIBILITY_REASON,
     }
 
 
@@ -182,6 +193,7 @@ def sanitize_result(row: dict[str, Any]) -> dict[str, Any]:
         "rr2",
         "rr3",
         "historical_tp_probability",
+        "historical_cl_probability",
         "median_days",
         "mfe",
         "mae",

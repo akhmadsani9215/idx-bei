@@ -1,43 +1,31 @@
 # PROJECT_STATE — RitelInsight
 
-Last updated: 2026-09-23
+Last updated: 2026-09-24
 
 ## Product
-**RitelInsight** — commercial decision-support.
+**RitelInsight** — personal decision-support (commercial path deferred).
 
 ## Current state
-**Agent 7 complete.** Local Git checkpoint prepared (commit only; no push).
+**CORE + UI DONE.** Personal-data mode complete for local use: stock/broker/index timeseries aligned; corporate refreshed; personal cost models available. Research locked (0 survivors, screener NOT_VALIDATED).
 
 ## Verified
-- Backend: **305 tests PASSED**
-- Frontend: `npm run build` PASSED
-- Decision pack: `docs/PRODUCTION_DECISION_PACK.md`
+- Discovery study: **0 survivors** — unchanged
+- Survivorship **NOT_VALIDATED**; registry default cost **NOT_CONFIGURED**
+- Personal operator cost/slippage: **CONFIGURED** (private provenance, as_of 2026-09-24)
+- Timeseries: **stock/broker/index = 883/883/883** (2023-01-02 → 2026-09-23); only 2026-09-24 missing (no IDX data yet)
+- Corporate actions: **1612** scraped
+- Fixed `idx parquet` CLI (was accidentally nested under bandarmology)
 
-## Product matrix (final)
+## Product matrix
 
 | Area | Status |
 |---|---|
-| Screener | GREEN |
+| Screener | GREEN (NOT_VALIDATED labeled) |
 | Stock Terminal | GREEN (EOD) |
-| Big Money | PARTIAL |
-| Strategy Lab | PARTIAL |
+| Big Money | GREEN enough for personal (broker history filled) |
+| Strategy Lab / Discovery | GREEN harness · edge NOT_VALIDATED |
 | Data Center | GREEN |
-| Watchlist | GREEN (session) |
-| Trading Plan / Journal | GREEN (session) |
-| AI | UNAVAILABLE |
-| Telegram | UNAVAILABLE |
-| Payment | UNAVAILABLE |
-| Realtime | UNAVAILABLE |
-| Auth / IdP | PARTIAL |
-| Schema | GREEN |
-| Security | PARTIAL |
-| Performance | PARTIAL |
-| Observability | PARTIAL |
-| Deployment | PARTIAL |
-| Commercial / IP | PARTIAL |
-
-## External decisions still open (Product Owner)
-Realtime source · IdP · KSEI policy · FX commercial source · AI · Telegram · Payment · hosting/TLS · NOTICE/SBOM / IDX data-rights
+| Commercial / IdP / Realtime | DEFERRED |
 
 ## Next task
-Product Owner: external contracts (decision pack §I / §J). Push only when explicitly requested.
+Optional: `uv run idx daily` after 2026-09-24 session publishes. No Stage-1 re-search. No commercial publish work until asked.

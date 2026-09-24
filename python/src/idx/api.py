@@ -9,15 +9,25 @@ import os
 import time
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import (
+    Depends,
+    FastAPI,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from idx.api_extra import register_extra_routes
 from idx.core.ownership import get_latest_shareholder_drift
 from idx.core.query import query_dataset
 from idx.core.utils import DATA_DIR, load_json
+from idx.cors_config import resolve_cors_origins
 from idx.graph import (
     calculate_board_centrality,
     detect_cross_holdings,
@@ -30,15 +40,14 @@ from idx.ingestion import (
     list_recent_jobs,
     run_async_ingestion_job,
 )
+from idx.public_static import resolve_public_data_path
+from idx.screener import run_screener
+from idx.security import install_security_middleware, require_operator
 from idx.signals import (
     broker_concentration_screen,
     build_briefing,
     compute_technical_indicators,
 )
-from idx.screener import run_screener
-from idx.api_extra import register_extra_routes
-from idx.cors_config import resolve_cors_origins
-from idx.public_static import resolve_public_data_path
 from idx.ticker_safe import sanitize_ticker
 
 app = FastAPI(
@@ -55,6 +64,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+install_security_middleware(app)
 
 # Extra production routes (watchlist, terminal aliases, strategy lab, providers).
 register_extra_routes(app)
@@ -174,6 +185,8 @@ class TriggerIngestionRequest(BaseModel):
 
 # Allowed job types for Data Center triggers (no fabricated pipelines).
 _ALLOWED_INGESTION_JOB_TYPES = frozenset({"daily", "backfill", "sync_all", "ownership"})
+# Strong references so fire-and-forget ingestion tasks are not garbage-collected mid-run.
+_BACKGROUND_TASKS: set[asyncio.Task] = set()
 
 
 def json_safe(value):
@@ -184,10 +197,7 @@ def json_safe(value):
 
     # Preserve mappings and recursively sanitize their values.
     if isinstance(value, dict):
-        return {
-            str(key): json_safe(item)
-            for key, item in value.items()
-        }
+        return {str(key): json_safe(item) for key, item in value.items()}
 
     # Recursively sanitize sequences while preserving list output.
     if isinstance(value, (list, tuple, set)):
@@ -232,12 +242,7 @@ def dataframe_to_json_records(df):
     records = []
 
     for row in df.to_dict(orient="records"):
-        records.append(
-            {
-                key: json_safe(value)
-                for key, value in row.items()
-            }
-        )
+        records.append({key: json_safe(value) for key, value in row.items()})
 
     return records
 
@@ -444,12 +449,7 @@ async def get_stock_data(
         errors="coerce",
     )
 
-    df = (
-        df
-        .dropna(subset=["Date"])
-        .sort_values("Date", kind="mergesort")
-        .reset_index(drop=True)
-    )
+    df = df.dropna(subset=["Date"]).sort_values("Date", kind="mergesort").reset_index(drop=True)
 
     if len(df) == 0:
         raise HTTPException(
@@ -460,8 +460,7 @@ async def get_stock_data(
     # One row per calendar session (keep last write if duplicates exist).
     df["_date_key"] = df["Date"].dt.strftime("%Y-%m-%d")
     df = (
-        df
-        .drop_duplicates(subset=["_date_key"], keep="last")
+        df.drop_duplicates(subset=["_date_key"], keep="last")
         .drop(columns=["_date_key"])
         .reset_index(drop=True)
     )
@@ -472,34 +471,22 @@ async def get_stock_data(
     )
 
     if limit and limit > 0 and len(tech) > limit:
-        tech = (
-            tech
-            .tail(limit)
-            .reset_index(drop=True)
-        )
+        tech = tech.tail(limit).reset_index(drop=True)
 
-    tech["time"] = tech["Date"].dt.strftime(
-        "%Y-%m-%d"
-    )
+    tech["time"] = tech["Date"].dt.strftime("%Y-%m-%d")
 
     if "OpenPrice" in tech.columns:
-        tech["open"] = tech["OpenPrice"].fillna(
-            tech["Close"]
-        )
+        tech["open"] = tech["OpenPrice"].fillna(tech["Close"])
     else:
         tech["open"] = tech["Close"]
 
     if "High" in tech.columns:
-        tech["high"] = tech["High"].fillna(
-            tech["Close"]
-        )
+        tech["high"] = tech["High"].fillna(tech["Close"])
     else:
         tech["high"] = tech["Close"]
 
     if "Low" in tech.columns:
-        tech["low"] = tech["Low"].fillna(
-            tech["Close"]
-        )
+        tech["low"] = tech["Low"].fillna(tech["Close"])
     else:
         tech["low"] = tech["Close"]
 
@@ -523,11 +510,7 @@ async def get_stock_data(
     ]
 
     output_df = tech.drop(
-        columns=[
-            column
-            for column in output_drop
-            if column in tech.columns
-        ],
+        columns=[column for column in output_drop if column in tech.columns],
         errors="ignore",
     )
 
@@ -586,12 +569,7 @@ async def get_stock_blocks(ticker: str):
         errors="coerce",
     )
 
-    df = (
-        df
-        .dropna(subset=["Date"])
-        .sort_values("Date")
-        .reset_index(drop=True)
-    )
+    df = df.dropna(subset=["Date"]).sort_values("Date").reset_index(drop=True)
 
     if len(df) == 0:
         raise HTTPException(
@@ -648,11 +626,7 @@ async def get_stock_blocks(ticker: str):
     # ForeignBuy / ForeignSell are share quantities in stock_summary.
     # Net IDR only when both share legs and close are known.
     nff_val = None
-    if (
-        foreign_buy is not None
-        and foreign_sell is not None
-        and close_price is not None
-    ):
+    if foreign_buy is not None and foreign_sell is not None and close_price is not None:
         nff_val = (foreign_buy - foreign_sell) * close_price
 
     # stock_summary does not contain broker-level buyer/seller pairs.
@@ -680,9 +654,7 @@ async def get_stock_blocks(ticker: str):
                 "total_turnover_rp": _round_or_none(reg_val),
                 "regular_volume_shares": _round_or_none(reg_vol),
                 "vwap_price": _round_or_none(vwap_price),
-                "vwap_status": (
-                    "AVAILABLE" if vwap_price is not None else "UNAVAILABLE"
-                ),
+                "vwap_status": ("AVAILABLE" if vwap_price is not None else "UNAVAILABLE"),
                 "non_regular_value_rp": _round_or_none(non_reg_val),
                 "non_regular_volume_shares": _round_or_none(non_reg_vol),
                 "non_regular_frequency": non_reg_freq,
@@ -702,6 +674,7 @@ async def get_stock_blocks(ticker: str):
             }
         )
     )
+
 
 @app.get("/api/broker-flow", tags=["Bandarmology"])
 async def get_broker_flow(
@@ -759,13 +732,7 @@ async def get_peers(ticker: str):
 
     df = pd.read_parquet(ratios_path)
 
-    latest = (
-        df
-        .sort_values("fsDate")
-        .groupby("code")
-        .last()
-        .reset_index()
-    )
+    latest = df.sort_values("fsDate").groupby("code").last().reset_index()
 
     return dataframe_to_json_records(latest)
 
@@ -807,16 +774,12 @@ async def screen_dividends(
 
 @app.get("/api/drift", tags=["Ownership"])
 async def get_drift():
-    return json_safe(
-        get_latest_shareholder_drift()
-    )
+    return json_safe(get_latest_shareholder_drift())
 
 
 @app.get("/api/graph/ubo/{ticker}", tags=["Knowledge Graph"])
 async def get_ubo(ticker: str):
-    return json_safe(
-        get_ubo_tree(ticker)
-    )
+    return json_safe(get_ubo_tree(ticker))
 
 
 @app.get("/api/graph/network/{ticker}", tags=["Knowledge Graph"])
@@ -841,9 +804,7 @@ async def get_centrality(top_n: int = 20):
 
 @app.get("/api/graph/cross-holdings", tags=["Knowledge Graph"])
 async def get_cross():
-    return json_safe(
-        detect_cross_holdings()
-    )
+    return json_safe(detect_cross_holdings())
 
 
 @app.post("/api/query/sql", tags=["Analytics"])
@@ -903,7 +864,6 @@ async def execute_sql(req: SQLQueryRequest):
     ]
 
     for name in table_names:
-
         p_file = os.path.join(
             DATA_DIR,
             "parquet",
@@ -911,21 +871,14 @@ async def execute_sql(req: SQLQueryRequest):
         )
 
         if os.path.exists(p_file):
-            con.execute(
-                f"CREATE OR REPLACE VIEW {name} "
-                f"AS SELECT * FROM read_parquet('{p_file}')"
-            )
+            con.execute(f"CREATE OR REPLACE VIEW {name} AS SELECT * FROM read_parquet('{p_file}')")
 
     try:
-
         res_df = con.execute(sql).fetchdf()
 
-        return dataframe_to_json_records(
-            res_df.head(req.limit)
-        )
+        return dataframe_to_json_records(res_df.head(req.limit))
 
     except Exception as e:
-
         raise HTTPException(
             status_code=400,
             detail=safe_http_detail(e, public="Invalid query"),
@@ -962,17 +915,9 @@ async def get_stealth_accumulation(
         "stock_summary.parquet",
     )
 
-    broker_df = (
-        pd.read_parquet(broker_path)
-        if os.path.exists(broker_path)
-        else pd.DataFrame()
-    )
+    broker_df = pd.read_parquet(broker_path) if os.path.exists(broker_path) else pd.DataFrame()
 
-    stock_df = (
-        pd.read_parquet(stock_path)
-        if os.path.exists(stock_path)
-        else pd.DataFrame()
-    )
+    stock_df = pd.read_parquet(stock_path) if os.path.exists(stock_path) else pd.DataFrame()
 
     res = detect_stealth_accumulation(
         broker_df,
@@ -983,18 +928,10 @@ async def get_stealth_accumulation(
     )
 
     result = {
-        "summary": json_safe(
-            res["summary"]
-        ),
-        "signal": json_safe(
-            res["signal"]
-        ),
-        "smart_money_delta": json_safe(
-            res["smart_money_delta"]
-        ),
-        "anomalies": dataframe_to_json_records(
-            res["anomalies_df"]
-        ),
+        "summary": json_safe(res["summary"]),
+        "signal": json_safe(res["signal"]),
+        "smart_money_delta": json_safe(res["smart_money_delta"]),
+        "anomalies": dataframe_to_json_records(res["anomalies_df"]),
     }
     set_in_cache(cache_key, result)
     return result
@@ -1009,7 +946,6 @@ async def backtest_strategy(
     from idx.backtest import run_backtest
 
     try:
-
         metrics, trades_df = run_backtest(
             strategy=req.strategy,
             holding_days=req.holding_days,
@@ -1022,31 +958,26 @@ async def backtest_strategy(
             position_sizing=req.position_sizing,
         )
 
-        cleaned_metrics = {}
+        cleaned_metrics: dict[str, Any] = {}
 
         for key, value in metrics.items():
-
             if isinstance(
                 value,
                 (float, np.floating),
             ):
-
                 if np.isnan(value) or np.isinf(value):
                     cleaned_metrics[key] = None
                 else:
-                    cleaned_metrics[key] = (
-                        value.item()
-                        if hasattr(value, "item")
-                        else value
-                    )
+                    cleaned_metrics[key] = value.item() if hasattr(value, "item") else value
 
             else:
                 cleaned_metrics[key] = json_safe(value)
 
         # CAGR must never be a silent alias of total return at the API boundary.
-        if cleaned_metrics.get("cagr_pct") is not None and cleaned_metrics.get(
-            "total_return_pct"
-        ) is not None:
+        if (
+            cleaned_metrics.get("cagr_pct") is not None
+            and cleaned_metrics.get("total_return_pct") is not None
+        ):
             if cleaned_metrics["cagr_pct"] == cleaned_metrics["total_return_pct"]:
                 cleaned_metrics["cagr_pct"] = None
 
@@ -1054,10 +985,7 @@ async def backtest_strategy(
         equity_curve: list[dict[str, object]] = []
 
         if len(trades_df) > 0:
-
-            trades_df_sorted = trades_df.sort_values(
-                ["ExitDate", "EntryDate", "StockCode"]
-            )
+            trades_df_sorted = trades_df.sort_values(["ExitDate", "EntryDate", "StockCode"])
 
             running_equity = 100.0
 
@@ -1077,7 +1005,7 @@ async def backtest_strategy(
                     continue
                 running_equity *= 1.0 + avg_period_return
                 if not math.isfinite(running_equity):
-                    running_equity = equity_curve[-1]["value"]  # type: ignore[index]
+                    running_equity = float(equity_curve[-1]["value"])  # type: ignore[arg-type]
                     break
                 equity_curve.append(
                     {
@@ -1101,9 +1029,7 @@ async def backtest_strategy(
         else:
             # No fabricated placeholder date — empty curve for zero-trade runs.
             equity_curve = []
-            cleaned_metrics["total_trades"] = int(
-                cleaned_metrics.get("total_trades") or 0
-            )
+            cleaned_metrics["total_trades"] = int(cleaned_metrics.get("total_trades") or 0)
             cleaned_metrics["trades_returned"] = 0
 
         return {
@@ -1113,7 +1039,6 @@ async def backtest_strategy(
         }
 
     except Exception as e:
-
         raise HTTPException(
             status_code=400,
             detail=safe_http_detail(e, public="Backtest failed"),
@@ -1131,18 +1056,14 @@ class ConnectionManager:
         websocket: WebSocket,
     ):
         await websocket.accept()
-        self.active_connections.append(
-            websocket
-        )
+        self.active_connections.append(websocket)
 
     def disconnect(
         self,
         websocket: WebSocket,
     ):
         if websocket in self.active_connections:
-            self.active_connections.remove(
-                websocket
-            )
+            self.active_connections.remove(websocket)
 
     async def broadcast(
         self,
@@ -1157,11 +1078,8 @@ class ConnectionManager:
         dead = []
 
         for conn in self.active_connections:
-
             try:
-                await conn.send_text(
-                    payload
-                )
+                await conn.send_text(payload)
 
             except Exception:
                 dead.append(conn)
@@ -1173,15 +1091,13 @@ class ConnectionManager:
 ws_manager = ConnectionManager()
 
 
-@app.post("/api/broadcast", tags=["System"])
+@app.post("/api/broadcast", tags=["System"], dependencies=[Depends(require_operator)])
 async def broadcast_event(event: dict):
     await ws_manager.broadcast(event)
 
     return {
         "status": "broadcast_sent",
-        "active_clients": len(
-            ws_manager.active_connections
-        ),
+        "active_clients": len(ws_manager.active_connections),
     }
 
 
@@ -1196,6 +1112,7 @@ async def api_ingestion_status():
 @app.post(
     "/api/system/trigger-ingestion",
     tags=["Ingestion & Data Pipeline"],
+    dependencies=[Depends(require_operator)],
 )
 async def api_trigger_ingestion(
     req: TriggerIngestionRequest,
@@ -1238,11 +1155,21 @@ async def api_trigger_ingestion(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    job_id = (
-        f"job-{uuid.uuid4().hex[:8]}"
-    )
+    from idx.ingestion import register_job_task, running_job
 
-    asyncio.create_task(
+    active = running_job()
+    if active is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Ingestion job {active['job_id']} ({active.get('type')}) is still running; "
+                "jobs share data files and are serialized."
+            ),
+        )
+
+    job_id = f"job-{uuid.uuid4().hex[:8]}"
+
+    task = asyncio.create_task(
         run_async_ingestion_job(
             job_id=job_id,
             job_type=req.job_type,
@@ -1250,6 +1177,9 @@ async def api_trigger_ingestion(
             broadcast_callback=ws_manager.broadcast,
         )
     )
+    _BACKGROUND_TASKS.add(task)
+    task.add_done_callback(_BACKGROUND_TASKS.discard)
+    register_job_task(job_id, task)
 
     label = {
         "daily": "Daily market-close",
@@ -1302,27 +1232,20 @@ async def websocket_stream(
     await ws_manager.connect(websocket)
 
     try:
-
         await websocket.send_text(
             json.dumps(
                 {
                     "type": "handshake",
                     "status": "connected",
                     "service": "idx-microservice-stream",
-                    "timestamp": (
-                        asyncio
-                        .get_event_loop()
-                        .time()
-                    ),
+                    "timestamp": (asyncio.get_event_loop().time()),
                 },
                 allow_nan=False,
             )
         )
 
         while True:
-
             try:
-
                 msg = await asyncio.wait_for(
                     websocket.receive_text(),
                     timeout=5.0,
@@ -1331,47 +1254,33 @@ async def websocket_stream(
                 data = json.loads(msg)
 
                 if data.get("type") == "ping":
-
                     await websocket.send_text(
                         json.dumps(
                             {
                                 "type": "pong",
-                                "time": (
-                                    asyncio
-                                    .get_event_loop()
-                                    .time()
-                                ),
+                                "time": (asyncio.get_event_loop().time()),
                             },
                             allow_nan=False,
                         )
                     )
 
             except TimeoutError:
-
                 await websocket.send_text(
                     json.dumps(
                         {
                             "type": "heartbeat",
                             "status": "alive",
-                            "timestamp": (
-                                asyncio
-                                .get_event_loop()
-                                .time()
-                            ),
-                            "connected_clients": len(
-                                ws_manager.active_connections
-                            ),
+                            "timestamp": (asyncio.get_event_loop().time()),
+                            "connected_clients": len(ws_manager.active_connections),
                         },
                         allow_nan=False,
                     )
                 )
 
     except WebSocketDisconnect:
-
         ws_manager.disconnect(websocket)
 
     except Exception:
-
         ws_manager.disconnect(websocket)
 
 

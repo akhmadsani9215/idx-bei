@@ -36,7 +36,25 @@ class StrategyLabRequest(BaseModel):
     take_profit_pct: float | None = None
 
 
+class StrategyValidationRequest(BaseModel):
+    """Explicit temporal windows — no server-side date defaults."""
+
+    strategy: str
+    horizon: str
+    holding_days: int = Field(ge=1, le=1260)
+    discovery_start: str
+    discovery_end: str
+    validation_start: str
+    validation_end: str
+    oos_start: str
+    oos_end: str
+    top_n: int = Field(default=10, ge=1, le=100)
+    min_turnover_rp: float = Field(default=1_000_000_000.0, ge=0)
+    walk_forward: dict[str, Any] | None = None
+
+
 def register_extra_routes(app) -> None:
+    from idx import watchlist_store as wl
     from idx.auth_session import (
         auth_status,
         create_session,
@@ -55,7 +73,12 @@ def register_extra_routes(app) -> None:
     )
     from idx.schema_version import DATA_SCHEMA_VERSION, attach_schema, normalize_company_record
     from idx.stock_terminal import build_stock_terminal
-    from idx.strategy_lab import list_strategies, run_strategy_lab
+    from idx.strategy_lab import (
+        latest_study_report,
+        list_strategies,
+        run_strategy_lab,
+        run_strategy_validation,
+    )
     from idx.ticker_safe import sanitize_ticker
     from idx.trading_plan import (
         enrich_plan,
@@ -65,7 +88,6 @@ def register_extra_routes(app) -> None:
         upsert_plan,
         weekly_recap,
     )
-    from idx import watchlist_store as wl
 
     def _session_token(
         authorization: str | None,
@@ -188,7 +210,11 @@ def register_extra_routes(app) -> None:
         try:
             fb_f = float(fb) if fb is not None and str(fb) != "nan" else None
             fs_f = float(fs) if fs is not None and str(fs) != "nan" else None
-            net = (fb_f - fs_f) if fb_f is not None and fs_f is not None else last.get("NetForeignFlow")
+            net = (
+                (fb_f - fs_f)
+                if fb_f is not None and fs_f is not None
+                else last.get("NetForeignFlow")
+            )
         except (TypeError, ValueError):
             fb_f = fs_f = net = None
         return attach_schema(
@@ -244,8 +270,7 @@ def register_extra_routes(app) -> None:
                 "basis": ownership.get("basis") or "disclosure",
                 "ownership": ownership,
                 "note": (
-                    "Disclosure-based ownership only — not transaction tape, "
-                    "not Fast-In/Fast-Out."
+                    "Disclosure-based ownership only — not transaction tape, not Fast-In/Fast-Out."
                 ),
                 "fast_in_fast_out": "UNAVAILABLE",
             }
@@ -349,6 +374,60 @@ def register_extra_routes(app) -> None:
             take_profit_pct=req.take_profit_pct,
         )
 
+    @app.post("/api/strategy/validate", tags=["Strategy Lab"])
+    def api_strategy_validate(req: StrategyValidationRequest):
+        from idx.signal_discovery.study import report_json_safe as json_safe
+
+        return json_safe(
+            run_strategy_validation(
+                req.strategy,
+                horizon=req.horizon,
+                holding_days=req.holding_days,
+                discovery=(req.discovery_start, req.discovery_end),
+                validation=(req.validation_start, req.validation_end),
+                oos=(req.oos_start, req.oos_end),
+                top_n=req.top_n,
+                min_turnover_rp=req.min_turnover_rp,
+                walk_forward=req.walk_forward,
+            )
+        )
+
+    @app.get("/api/strategy/research", tags=["Strategy Lab"])
+    async def api_strategy_research():
+        from idx.signal_discovery.study import report_json_safe as json_safe
+
+        report = latest_study_report()
+        if report is None:
+            return {"status": "NOT_VALIDATED", "reason": "no discovery study report", "trials": []}
+        return json_safe(
+            {
+                "status": "AVAILABLE",
+                "generated_at": report.get("generated_at"),
+                "verdict_counts": report.get("verdict_counts"),
+                "protocol": report.get("protocol"),
+                "survivorship": report.get("survivorship"),
+                "trials": [
+                    {
+                        k: t.get(k)
+                        for k in (
+                            "strategy_id",
+                            "family",
+                            "horizon",
+                            "holding_days",
+                            "verdict",
+                            "verdict_reasons",
+                            "robustness_status",
+                            "eligibility_status",
+                        )
+                    }
+                    | {"oos": (t.get("phases") or {}).get("OOS")}
+                    for t in report.get("trials", [])
+                ],
+                "not_evaluated": report.get("not_evaluated"),
+                "production_buy_emitted": False,
+            }
+        )
+
     @app.get("/api/watchlist", tags=["Watchlist"])
     async def api_watchlist_list(
         authorization: str | None = Header(default=None),
@@ -379,9 +458,7 @@ def register_extra_routes(app) -> None:
     ):
         principal = _principal(authorization, x_ritel_session)
         try:
-            return wl.update_item(
-                principal, ticker, strip_client_identity_fields(body)
-            )
+            return wl.update_item(principal, ticker, strip_client_identity_fields(body))
         except KeyError as exc:
             raise HTTPException(status_code=404, detail=f"Not found: {ticker}") from exc
 
@@ -456,7 +533,8 @@ def register_extra_routes(app) -> None:
     @app.post("/api/notifications/enqueue", tags=["Notifications"])
     async def api_notifications_enqueue(body: dict[str, Any]):
         event_type = str(body.get("event_type") or "generic")
-        payload = body.get("payload") if isinstance(body.get("payload"), dict) else {}
+        raw_payload = body.get("payload")
+        payload: dict[str, Any] = raw_payload if isinstance(raw_payload, dict) else {}
         return NotificationProvider().enqueue(event_type, payload)
 
     @app.get("/api/payment", tags=["Payment"], include_in_schema=False)

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+from idx import watchlist_store as wl
 from idx.auth_session import (
     clear_sessions_for_tests,
     create_session,
@@ -20,7 +20,6 @@ from idx.cors_config import resolve_cors_origins
 from idx.providers import AIProvider, NotificationProvider, PaymentProvider
 from idx.public_static import PUBLIC_DATA_FILES, resolve_public_data_path
 from idx.ticker_safe import sanitize_ticker
-from idx import watchlist_store as wl
 
 
 @pytest.fixture
@@ -74,9 +73,7 @@ def test_cors_dev_wildcard_disables_credentials():
     dev = resolve_cors_origins(env="development", origins_env=None)
     assert "*" in dev["allow_origins"]
     assert dev["allow_credentials"] is False
-    prod = resolve_cors_origins(
-        env="production", origins_env="https://app.ritelinsight.example"
-    )
+    prod = resolve_cors_origins(env="production", origins_env="https://app.ritelinsight.example")
     assert prod["allow_credentials"] is True
     assert "*" not in prod["allow_origins"]
 

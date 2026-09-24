@@ -7,7 +7,8 @@ Last updated: 2026-09-23
 - **Frontend:** React 19 + TypeScript + Vite SPA (`frontend/`); charts via TradingView Lightweight Charts (Apache-2.0).
 - **Analytics data path:** scrapers → partitioned timeseries → Parquet exports; query/analytics via **DuckDB** (+ PyArrow).
 - **Optional graph:** Neo4j available via compose/CLI for ownership/network — **optional**, use only when graph analytics are required.
-- **MCP:** stdio MCP server under `python/src/idx/mcp/`.
+- **MCP:** stdio MCP server under `python/src/idx/mcp/` (`uv run idx mcp`). Cursor project config: `.cursor/mcp.json`.
+- **Alpha Index (external):** `idx.alpha_index` HTTP client + MCP tools `alpha_broker_summary` / `alpha_stock_history` / `alpha_foreign_flow`. Auth = HTTP Bearer from `ALPHA_INDEX_API_KEY`. Optional remote MCP URL `https://api.indexalpha.id/mcp` (OAuth). Does not replace local Parquet as SoT.
 
 ## Storage direction
 - **Parquet + DuckDB:** preferred for historical/market analytics locally.
@@ -61,6 +62,25 @@ Last updated: 2026-09-23
 - **Public static:** allowlisted `/data/{filename}` only (`public_static.PUBLIC_DATA_FILES`) — never mount whole `DATA_DIR`.
 - **Ops:** `/health`, `/ready`, `/api/ops/status` (`ops_status`).
 - **Decision pack:** `docs/PRODUCTION_DECISION_PACK.md` (vendor shortlists; no auto-select).
+
+## Signal Discovery & Validation Lab (2026-09-23 Agen 8)
+- Package: `idx.signal_discovery` — `contract`, `hypotheses`, `registry`, `runner`, `validation`, `metrics_adapter`, `costs`, `survivorship`, `robustness`, `multiple_testing`, `study`.
+- Design doc: `docs/SIGNAL_DISCOVERY_VALIDATION_LAB.md`.
+- **Single execution engine remains** `idx.backtest.run_backtest`; screener production path unchanged.
+- Cluster 1: foundation contracts/horizons/invariants.
+- Cluster 2: Stage-1 discovery runner + trial registry.
+- Cluster 3: temporal IS→VALIDATION→OOS + expanding walk-forward; max eligibility `VALIDATED_FOR_RESEARCH` (never PRODUCTION BUY).
+- Cluster 4: `costs` (Cost/SlippageModel; gross vs net semantics applied post-engine to the trade ledger), `survivorship` (policy + observational audit), `robustness` (one-at-a-time neighbours on IS/VALIDATION via `validation.evaluate_window_with_trades` → same `run_backtest`). Dependency: `costs`/`survivorship` standalone → `validation` → `robustness`; registry counts robustness variants for multiple testing.
+- Clusters 5–8: `run_backtest` ledger outcomes (MFE/MAE/exit reason/holding), data-gap segmentation (`MAX_SESSION_GAP_DAYS`), pre-window warm-up, `TECHNICAL_RULES` (5 single-rule strategies, content-hash feature cache); `study` (pre-registered multi-horizon protocol, CLI `idx discovery-study` → `data/research/`); `multiple_testing` (PSR/DSR/BH).
+- Price basis: `idx.core.price_adjustment` (causal `forward_adjust` from IDX `Previous`); default on in `run_backtest`. Trades spanning a price-distorting CA are excluded (`exclude_ca_events`, optional precomputed `ca_event_index`). Survivorship CA-type constants live in `price_adjustment` and are re-used by the audit.
+- Strategy Lab reads the latest study report (`strategy_lab.research_validation`) and runs `run_validation` via `/api/strategy/validate`; `/api/strategy/research` summarizes verdicts.
+- Frontend Strategy Lab (`BacktesterTab`) consumes catalog + research endpoints and Methodology panel; Screener meta/UI expose `production_eligibility=NOT_VALIDATED`. Lab/Data Center/Plan do not depend on `network_alpha` blob.
+- Offline `python/backtest_v3*.py` = research artifacts only — not production proof (predate gap segmentation).
+
+## Security / ops baseline (2026-09-23 Cluster 12–13)
+- `idx.security`: `require_operator` (env `RITELINSIGHT_ADMIN_TOKEN`, fail-closed in production) on `/api/broadcast` and `/api/system/trigger-ingestion`; in-process sliding-window rate limiter (on in production); security headers (+HSTS in production).
+- Ingestion jobs serialized (409 while one runs); task references retained; dead-loop tasks → `interrupted`; last 50 jobs persisted in `data/.ingestion_job_history.json`; `/api/ops/status` exposes security + jobs.
+- `idx.sbom` + CLI `idx sbom` → `docs/SBOM.cdx.json` (CycloneDX 1.5, declared licenses only).
 
 ## FX / Yahoo path (2026-09-23 Agen 7)
 - Default production FX: local `usd_idr_rate.json` cache → stale cache → `DEFAULT_USD_IDR_RATE` constant.

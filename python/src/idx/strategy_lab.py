@@ -6,12 +6,19 @@ strategies or marks UNAVAILABLE / INSUFFICIENT OOS VALIDATION.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import glob
+import json
+import os
+from datetime import UTC, datetime
 from typing import Any
 
+from idx.backtest import TECHNICAL_RULES
+from idx.core.utils import DATA_DIR
 from idx.schema_version import DATA_SCHEMA_VERSION
 
-ENGINE_VERSION = "strategy-lab-1.0"
+ENGINE_VERSION = "strategy-lab-2.0"
+RESEARCH_DIR = os.path.join(DATA_DIR, "research")
+_STUDY_CACHE: dict[str, Any] = {"path": None, "mtime": None, "report": None}
 
 # Product label → existing engine strategy id (or None if not implemented)
 STRATEGY_CATALOG: dict[str, dict[str, Any]] = {
@@ -31,7 +38,10 @@ STRATEGY_CATALOG: dict[str, dict[str, Any]] = {
         "engine": "bandarmology",
         "status": "PARTIAL",
         "oos": "INSUFFICIENT OOS VALIDATION",
-        "notes": "Market-wide broker concentration proxy — not actor attribution.",
+        "notes": (
+            "Legacy engine id: bullish EMA regime ranked by 20-session volume ratio. "
+            "Uses no broker data — not actor attribution."
+        ),
     },
     "sharia_value": {
         "engine": "sharia_value",
@@ -61,22 +71,34 @@ STRATEGY_CATALOG: dict[str, dict[str, Any]] = {
         "notes": "No intraday tape — cannot validate.",
     },
     "momentum": {
-        "engine": None,
-        "status": "UNAVAILABLE",
+        "engine": "momentum",
+        "status": "AVAILABLE",
         "oos": "INSUFFICIENT OOS VALIDATION",
-        "notes": "Research-only in backtest_v3*; not productized in run_backtest.",
+        "notes": "Signal Discovery Stage-1 rule: " + TECHNICAL_RULES["momentum"],
     },
     "pullback": {
-        "engine": None,
-        "status": "UNAVAILABLE",
+        "engine": "pullback",
+        "status": "AVAILABLE",
         "oos": "INSUFFICIENT OOS VALIDATION",
-        "notes": "Research-only in backtest_v3*; not productized.",
+        "notes": "Signal Discovery Stage-1 rule: " + TECHNICAL_RULES["pullback"],
     },
     "breakout": {
-        "engine": None,
-        "status": "UNAVAILABLE",
+        "engine": "breakout",
+        "status": "AVAILABLE",
         "oos": "INSUFFICIENT OOS VALIDATION",
-        "notes": "Research-only in backtest_v3*; not productized.",
+        "notes": "Signal Discovery Stage-1 rule: " + TECHNICAL_RULES["breakout"],
+    },
+    "mean_reversion": {
+        "engine": "mean_reversion",
+        "status": "AVAILABLE",
+        "oos": "INSUFFICIENT OOS VALIDATION",
+        "notes": "Signal Discovery Stage-1 rule: " + TECHNICAL_RULES["mean_reversion"],
+    },
+    "volume_expansion": {
+        "engine": "volume_expansion",
+        "status": "AVAILABLE",
+        "oos": "INSUFFICIENT OOS VALIDATION",
+        "notes": "Signal Discovery Stage-1 rule: " + TECHNICAL_RULES["volume_expansion"],
     },
     "absorption": {
         "engine": None,
@@ -105,20 +127,85 @@ STRATEGY_CATALOG: dict[str, dict[str, Any]] = {
 }
 
 
+def latest_study_report() -> dict[str, Any] | None:
+    """Newest ``idx discovery-study`` report under ``DATA_DIR/research`` (mtime-cached)."""
+    paths = sorted(glob.glob(os.path.join(RESEARCH_DIR, "discovery_study_*.json")))
+    if not paths:
+        return None
+    path = paths[-1]
+    mtime = os.path.getmtime(path)
+    if _STUDY_CACHE["path"] != path or _STUDY_CACHE["mtime"] != mtime:
+        try:
+            with open(path, encoding="utf-8") as fh:
+                report = json.load(fh)
+        except (OSError, ValueError):
+            return None
+        _STUDY_CACHE.update({"path": path, "mtime": mtime, "report": report})
+    return _STUDY_CACHE["report"]
+
+
+def research_validation(engine: str | None) -> dict[str, Any]:
+    """Per-horizon study verdicts for an engine strategy; never a production status."""
+    if engine is None:
+        return {"status": "UNAVAILABLE", "by_horizon": {}, "report": None}
+    report = latest_study_report()
+    if report is None:
+        return {
+            "status": "NOT_VALIDATED",
+            "reason": "no discovery study report",
+            "by_horizon": {},
+            "report": None,
+        }
+    from idx.signal_discovery.hypotheses import list_stage1_hypotheses
+
+    ids = {h["strategy_id"] for h in list_stage1_hypotheses() if h["engine_strategy"] == engine}
+    by_horizon = {
+        t["horizon"]: t["verdict"] for t in report.get("trials", []) if t.get("strategy_id") in ids
+    }
+    if not by_horizon:
+        status = "NOT_VALIDATED"
+    elif "SURVIVES_RESEARCH_VALIDATION" in by_horizon.values():
+        status = "SURVIVES_RESEARCH_VALIDATION"
+    else:
+        status = "NOT_VALIDATED"
+    return {
+        "status": status,
+        "by_horizon": by_horizon,
+        "report": os.path.basename(_STUDY_CACHE["path"] or "") or None,
+        "study_generated_at": report.get("generated_at"),
+        "production_status": None,
+    }
+
+
+def _oos_label(engine: str | None, default: str) -> str:
+    rv = research_validation(engine)
+    if not rv["by_horizon"]:
+        return default
+    summary = ", ".join(f"{h}={v}" for h, v in sorted(rv["by_horizon"].items()))
+    return f"{rv['status']} (research study: {summary})"
+
+
 def list_strategies() -> dict[str, Any]:
     return {
         "strategies": [
-            {"id": k, **v, "profitable_claim": False}
+            {
+                "id": k,
+                **v,
+                "oos": _oos_label(v.get("engine"), v["oos"]),
+                "research_validation": research_validation(v.get("engine")),
+                "profitable_claim": False,
+            }
             for k, v in STRATEGY_CATALOG.items()
         ],
         "engine_version": ENGINE_VERSION,
         "DATA_SCHEMA_VERSION": DATA_SCHEMA_VERSION,
         "notes": [
             "Do not treat positive historical metrics as proven profitability.",
-            "Walk-forward / OOS validation is INSUFFICIENT for all listed strategies.",
+            "OOS/walk-forward/robustness/DSR verdicts come from the pre-registered discovery study.",
+            "SURVIVES_RESEARCH_VALIDATION is research evidence only — never a production BUY.",
             "Offline backtest_v3* labs remain research artifacts, not production proof.",
         ],
-        "calculated_at": datetime.now(timezone.utc).isoformat(),
+        "calculated_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -134,6 +221,7 @@ def normalize_lab_metrics(metrics: dict[str, Any] | None) -> dict[str, Any]:
         "median_mfe_pct",
         "median_mae_pct",
         "median_days",
+        "median_holding_sessions",
         "max_drawdown_pct",
         "tp_hit_rate_pct",
         "cl_hit_rate_pct",
@@ -142,26 +230,36 @@ def normalize_lab_metrics(metrics: dict[str, Any] | None) -> dict[str, Any]:
         "sortino_ratio",
         "profit_factor",
     )
+    optional = (
+        "mfe",
+        "mae",
+        "median_mfe_pct",
+        "median_mae_pct",
+        "median_days",
+        "median_holding_sessions",
+        "tp_hit_rate_pct",
+        "cl_hit_rate_pct",
+    )
     out: dict[str, Any] = {}
     src = metrics or {}
     # Aliases from run_backtest naming
     if "total_trades" in src and "sample" not in src:
         out["sample"] = src.get("total_trades")
+    has_trades = bool(src.get("total_trades"))
     for k in keys:
         if k in src and src[k] is not None:
             out[k] = src[k]
         elif k == "sample" and "sample" in out:
             continue
-        elif k in ("mfe", "mae", "median_mfe_pct", "median_mae_pct", "median_days", "tp_hit_rate_pct", "cl_hit_rate_pct"):
-            out[k] = None  # UNAVAILABLE in structured response
-            out[f"{k}_status"] = "UNAVAILABLE"
+        elif k in optional:
+            out[k] = None
+            rule_gap = has_trades and k in ("tp_hit_rate_pct", "cl_hit_rate_pct")
+            out[f"{k}_status"] = "NOT_CONFIGURED" if rule_gap else "UNAVAILABLE"
         elif k in src:
             out[k] = src[k]
     # distribution placeholder
     out["distribution"] = src.get("distribution")
-    out["distribution_status"] = (
-        "OK" if src.get("distribution") is not None else "UNAVAILABLE"
-    )
+    out["distribution_status"] = "OK" if src.get("distribution") is not None else "UNAVAILABLE"
     return out
 
 
@@ -171,10 +269,14 @@ def validation_flags(
     has_oos: bool = False,
 ) -> dict[str, Any]:
     return {
-        "lookahead_guard": "PIT entry_date slicing enforced in idx.backtest",
+        "lookahead_guard": "PIT entry_date slicing; trailing features; no data-gap crossing",
         "leakage_risk": "LOW_IF_PIT_HONORED",
-        "survivorship": "UNADDRESSED — listed universe only, no delisting reconstruction",
-        "overfit": "UNKNOWN — no walk-forward/OOS harness in production path",
+        "survivorship": "NOT_VALIDATED — no delisting/suspension/ticker-change data",
+        "overfit": (
+            "Single run is not overfit-controlled; use /api/strategy/validate (IS/VAL/OOS/WF) "
+            "and the discovery study (robustness, DSR, BH-FDR)"
+        ),
+        "cost_slippage": "NOT_CONFIGURED — returns are gross, unadjusted Close",
         "insufficient_sample": bool(sample_size is not None and sample_size < 30),
         "oos_status": "OK" if has_oos else "INSUFFICIENT OOS VALIDATION",
         "profitable_claim_allowed": False,
@@ -211,7 +313,7 @@ def run_strategy_lab(
             "profitable_claim": False,
             "engine_version": ENGINE_VERSION,
             "DATA_SCHEMA_VERSION": DATA_SCHEMA_VERSION,
-            "calculated_at": datetime.now(timezone.utc).isoformat(),
+            "calculated_at": datetime.now(UTC).isoformat(),
         }
 
     from idx.backtest import run_backtest
@@ -269,13 +371,87 @@ def run_strategy_lab(
             sample_size=int(sample) if sample is not None else None,
             has_oos=False,
         ),
+        "research_validation": research_validation(meta["engine"]),
         "profitable_claim": False,
         "disclaimer": (
             "Historical metrics are descriptive only. "
             "INSUFFICIENT OOS VALIDATION — do not treat as production edge. "
-            "MFE/MAE/TP-hit may be UNAVAILABLE when the engine does not compute them."
+            "MFE/MAE come from realised trade paths; TP/CL hit rates need a configured rule."
         ),
         "engine_version": ENGINE_VERSION,
         "DATA_SCHEMA_VERSION": DATA_SCHEMA_VERSION,
-        "calculated_at": datetime.now(timezone.utc).isoformat(),
+        "calculated_at": datetime.now(UTC).isoformat(),
     }
+
+
+def run_strategy_validation(
+    strategy_id: str,
+    *,
+    horizon: str,
+    holding_days: int,
+    discovery: tuple[str, str],
+    validation: tuple[str, str],
+    oos: tuple[str, str],
+    top_n: int = 10,
+    min_turnover_rp: float = 1_000_000_000,
+    walk_forward: dict[str, Any] | None = None,
+    injected_frames: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """IS → VALIDATION → OOS (+ optional walk-forward) through the discovery harness."""
+    from idx.signal_discovery.validation import (
+        ValidationConfig,
+        ValidationConfigError,
+        ValidationWindow,
+        WalkForwardConfig,
+        run_validation,
+    )
+
+    meta = STRATEGY_CATALOG.get(strategy_id)
+    if meta is None or meta.get("engine") is None:
+        return {
+            "status": "UNAVAILABLE",
+            "strategy": strategy_id,
+            "reason": "unknown strategy" if meta is None else meta.get("notes"),
+            "production_buy_emitted": False,
+        }
+    try:
+        wf = WalkForwardConfig(**walk_forward) if walk_forward else None
+    except (TypeError, ValidationConfigError) as exc:
+        return {"status": "REJECTED", "failure_reason": f"walk_forward: {exc}"}
+
+    frames = injected_frames or {}
+    stock_df = frames.get("stock_df")
+    if stock_df is None:
+        from idx.backtest import _load_data
+
+        stock_df, ratios_df, actions_df = _load_data()
+    else:
+        ratios_df, actions_df = frames.get("ratios_df"), frames.get("actions_df")
+    dates = stock_df["Date"].astype(str).str[:10] if len(stock_df) else None
+
+    cfg = ValidationConfig(
+        trial_id=f"lab::{strategy_id}::{horizon}::{holding_days}",
+        strategy_id=strategy_id,
+        strategy_version=ENGINE_VERSION,
+        horizon=horizon,
+        engine_strategy=meta["engine"],
+        parameters={"top_n": int(top_n), "min_turnover_rp": float(min_turnover_rp)},
+        holding_days=int(holding_days),
+        discovery=ValidationWindow(*discovery),
+        validation=ValidationWindow(*validation),
+        oos=ValidationWindow(*oos),
+        universe_definition=f"20-session avg Value >= {min_turnover_rp:.0f}",
+        data_available_start=dates.min() if dates is not None else None,
+        data_available_end=dates.max() if dates is not None else None,
+        walk_forward=wf,
+        stock_df=stock_df,
+        ratios_df=ratios_df,
+        actions_df=actions_df,
+    )
+    try:
+        result = run_validation(cfg)
+    except ValidationConfigError as exc:
+        return {"status": "REJECTED", "failure_reason": str(exc)}
+    result["strategy"] = strategy_id
+    result["research_validation"] = research_validation(meta["engine"])
+    return result

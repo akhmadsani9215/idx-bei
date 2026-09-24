@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from idx.auth_session import SessionPrincipal
@@ -26,7 +26,7 @@ _ZERO = {"SIDEWAY", "NORMAL", "", None}
 
 
 def _utc() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _norm(value: Any) -> str:
@@ -235,7 +235,7 @@ def list_plans(principal: SessionPrincipal) -> list[dict[str, Any]]:
 
 def upsert_plan(principal: SessionPrincipal, plan: dict[str, Any]) -> dict[str, Any]:
     enriched = enrich_plan(plan)
-    plan_id = str(enriched.get("id") or f"plan_{int(datetime.now(timezone.utc).timestamp() * 1000)}")
+    plan_id = str(enriched.get("id") or f"plan_{int(datetime.now(UTC).timestamp() * 1000)}")
     enriched["id"] = plan_id
     with _LOCK:
         data = _load()
@@ -262,7 +262,7 @@ def list_journals(principal: SessionPrincipal) -> list[dict[str, Any]]:
 
 def upsert_journal(principal: SessionPrincipal, entry: dict[str, Any]) -> dict[str, Any]:
     enriched = enrich_journal(entry)
-    jid = str(enriched.get("id") or f"jrn_{int(datetime.now(timezone.utc).timestamp() * 1000)}")
+    jid = str(enriched.get("id") or f"jrn_{int(datetime.now(UTC).timestamp() * 1000)}")
     enriched["id"] = jid
     with _LOCK:
         data = _load()

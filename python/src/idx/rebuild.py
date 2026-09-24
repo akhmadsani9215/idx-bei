@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import os
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pandas as pd
@@ -25,7 +25,7 @@ ENGINE_VERSION = "rebuild-1.0"
 
 
 def _utc() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _write_json(path: str, payload: dict[str, Any]) -> None:
@@ -81,8 +81,12 @@ def rebuild_features(
                         "close": float(last["Close"]) if pd.notna(last.get("Close")) else None,
                         "atr14": float(last["ATR14"]) if pd.notna(last.get("ATR14")) else None,
                         "rvol": float(last["RVOL"]) if pd.notna(last.get("RVOL")) else None,
-                        "high_20d": float(last["HIGH_20D"]) if pd.notna(last.get("HIGH_20D")) else None,
-                        "low_20d": float(last["LOW_20D"]) if pd.notna(last.get("LOW_20D")) else None,
+                        "high_20d": float(last["HIGH_20D"])
+                        if pd.notna(last.get("HIGH_20D"))
+                        else None,
+                        "low_20d": float(last["LOW_20D"])
+                        if pd.notna(last.get("LOW_20D"))
+                        else None,
                         "engine_version": SCREENER_ENGINE,
                     }
                 )

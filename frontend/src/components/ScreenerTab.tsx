@@ -138,6 +138,16 @@ export const ScreenerTab: React.FC<ScreenerTabProps> = ({ onSelectTicker }) => {
           <p style={{ margin: '0.35rem 0 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
             DATA → FEATURE → SIGNAL → TARGET → RISK → HISTORICAL STATS
           </p>
+          <p style={{ margin: '0.35rem 0 0', color: '#fde68a', fontSize: '0.8rem' }}>
+            production_eligibility ={' '}
+            <strong>
+              {dash(
+                (meta?.production_eligibility as string | undefined) ?? 'NOT_VALIDATED',
+              )}
+            </strong>
+            {' '}— decision support only; not a validated production BUY.
+            Cost/slippage NOT_CONFIGURED · survivorship NOT_VALIDATED.
+          </p>
           {blurb && (
             <p style={{ margin: '0.25rem 0 0', color: '#94a3b8', fontSize: '0.8rem' }}>
               {blurb}
@@ -299,6 +309,7 @@ export const ScreenerTab: React.FC<ScreenerTabProps> = ({ onSelectTicker }) => {
                   'n',
                   'DQ',
                   'Conf',
+                  'Elig',
                   'Why',
                 ].map((h) => (
                   <th key={h} style={{ padding: '0.55rem 0.45rem', whiteSpace: 'nowrap', fontWeight: 600 }}>
@@ -367,6 +378,9 @@ export const ScreenerTab: React.FC<ScreenerTabProps> = ({ onSelectTicker }) => {
                   </td>
                   <td style={{ padding: '0.5rem 0.45rem', fontFamily: 'monospace' }}>{dash(row.data_quality)}</td>
                   <td style={{ padding: '0.5rem 0.45rem', fontFamily: 'monospace' }}>{fmtNum(row.confidence, 2)}</td>
+                  <td style={{ padding: '0.5rem 0.45rem', fontFamily: 'monospace', color: '#fde68a' }}>
+                    {dash(row.production_eligibility ?? 'NOT_VALIDATED')}
+                  </td>
                   <td
                     style={{
                       padding: '0.5rem 0.45rem',

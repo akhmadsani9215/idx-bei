@@ -192,7 +192,22 @@ export const App: React.FC = () => {
       />
 
       <main className="main-container" style={{ padding: '1.5rem 2rem' }}>
-        {error && !data && activeTab !== 'opportunities' && (
+        {/* Production Screener + Strategy Lab + Data Center do not require network_alpha blob */}
+        {activeTab === 'opportunities' && (
+          <ScreenerTab onSelectTicker={handleSelectStock} />
+        )}
+        {activeTab === 'big_money' && <BigMoneyTab selectedTicker={selectedTicker} />}
+        {activeTab === 'trading_plan' && <TradingPlanTab />}
+        <Suspense fallback={<TabFallback />}>
+          {activeTab === 'simulator' && (
+            <BacktesterTab onSelectStock={handleSelectStock} />
+          )}
+          {activeTab === 'ingestion' && (
+            <IngestionTab lastLiveEvent={lastEvent} />
+          )}
+        </Suspense>
+
+        {error && !data && (activeTab === 'terminal' || activeTab === 'power_map') && (
           <div className="error-banner">
             <AlertTriangle size={48} />
             <h2>Data Unavailable</h2>
@@ -202,18 +217,11 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {loading && !data && activeTab !== 'opportunities' && (
+        {loading && !data && (activeTab === 'terminal' || activeTab === 'power_map') && (
           <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-secondary)' }}>
             <p style={{ fontSize: '1.2rem' }}>Loading quantitative intelligence...</p>
           </div>
         )}
-
-        {/* Production Screener does not require network_alpha dashboard blob */}
-        {activeTab === 'opportunities' && (
-          <ScreenerTab onSelectTicker={handleSelectStock} />
-        )}
-        {activeTab === 'big_money' && <BigMoneyTab selectedTicker={selectedTicker} />}
-        {activeTab === 'trading_plan' && <TradingPlanTab />}
 
         {data && (
           <Suspense fallback={<TabFallback />}>
@@ -238,39 +246,29 @@ export const App: React.FC = () => {
                 onSelectCompany={handleSelectStock}
               />
             )}
-
-            {activeTab === 'simulator' && (
-              <BacktesterTab
-                onSelectStock={handleSelectStock}
-              />
-            )}
-
-            {activeTab === 'ingestion' && (
-              <IngestionTab
-                lastLiveEvent={lastEvent}
-              />
-            )}
-
-            {/* 1-Click Printable Investor Dossier / Memo Modal */}
-            {memoCompany && (
-              <InvestorMemoModal
-                company={memoCompany}
-                onClose={() => setMemoCompany(null)}
-              />
-            )}
-
-            {/* Watchlist & Live Alerts Slide-over Drawer */}
-            <WatchlistDrawer
-              isOpen={isWatchlistOpen}
-              onClose={() => setIsWatchlistOpen(false)}
-              watchlist={watchlist}
-              onRemoveWatchlist={removeStar}
-              onSelectStock={handleSelectStock}
-              alerts={alerts}
-            />
           </Suspense>
         )}
       </main>
+
+      {memoCompany && (
+        <Suspense fallback={null}>
+          <InvestorMemoModal
+            company={memoCompany}
+            onClose={() => setMemoCompany(null)}
+          />
+        </Suspense>
+      )}
+
+      <Suspense fallback={null}>
+        <WatchlistDrawer
+          isOpen={isWatchlistOpen}
+          onClose={() => setIsWatchlistOpen(false)}
+          watchlist={watchlist}
+          onRemoveWatchlist={removeStar}
+          onSelectStock={handleSelectStock}
+          alerts={alerts}
+        />
+      </Suspense>
 
       <footer style={{
         textAlign: 'center',

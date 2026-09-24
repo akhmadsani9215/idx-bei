@@ -6,11 +6,13 @@ Past signal outcomes may use bars AFTER those historical signal dates
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
+from idx.backtest import MAX_SESSION_GAP_DAYS
 from idx.screener.contract import (
     MIN_HISTORICAL_SAMPLE,
     MIN_RR,
@@ -19,6 +21,11 @@ from idx.screener.contract import (
     empty_historical_stats,
 )
 from idx.screener.structure import enrich_structure, select_dynamic_levels
+
+OUTCOME_BASIS = (
+    "FIRST_TOUCH — TP vs CL on subsequent bars within a complete, gap-free horizon; "
+    "same-bar TP+CL counts as CL (conservative)"
+)
 
 
 def _forward_mfe_mae(
@@ -46,18 +53,32 @@ def _forward_mfe_mae(
     return mfe, mae, days
 
 
-def _tp_hit(
+def _first_touch(
     highs: np.ndarray,
-    entry: float,
+    lows: np.ndarray,
     tp: float,
+    cl: float | None,
     start_i: int,
     horizon: int,
-) -> tuple[bool, int | None]:
+) -> tuple[str, int | None]:
+    """``("TP"|"CL"|"NONE", bars)`` — whichever level is touched first after the signal bar."""
     end = min(len(highs), start_i + 1 + horizon)
     for j in range(start_i + 1, end):
+        if cl is not None and lows[j] <= cl:
+            return "CL", j - start_i
         if highs[j] >= tp:
-            return True, j - start_i
-    return False, None
+            return "TP", j - start_i
+    return "NONE", None
+
+
+def _gap_free(dates: np.ndarray | None, start_i: int, horizon: int) -> bool:
+    if dates is None:
+        return True
+    window = dates[start_i : start_i + horizon + 1]
+    if len(window) < 2:
+        return True
+    steps = np.diff(window).astype("timedelta64[D]").astype(int)
+    return bool((steps <= MAX_SESSION_GAP_DAYS).all())
 
 
 def compute_historical_stats(
@@ -101,11 +122,20 @@ def compute_historical_stats(
         errors="coerce",
     ).to_numpy(dtype=float)
 
+    dates = (
+        pd.to_datetime(g["Date"], errors="coerce").to_numpy(dtype="datetime64[ns]")
+        if "Date" in g.columns
+        else None
+    )
+
     mfes: list[float] = []
     maes: list[float] = []
     days_list: list[int] = []
     tp_hits = 0
+    cl_hits = 0
     sample = 0
+    skipped_incomplete = 0
+    skipped_gap = 0
 
     for i in range(14, last_i):
         row = g.iloc[i]
@@ -137,22 +167,37 @@ def compute_historical_stats(
         tp1 = levels["tp1"]
         if entry is None or tp1 is None:
             continue
+        if i + horizon > n - 1:
+            skipped_incomplete += 1
+            continue
+        if not _gap_free(dates, i, horizon):
+            skipped_gap += 1
+            continue
 
         mfe, mae, days = _forward_mfe_mae(highs, lows, float(entry), i, horizon)
         if mfe is None or mae is None:
             continue
 
-        hit, hit_days = _tp_hit(highs, float(entry), float(tp1), i, horizon)
+        cl1 = levels.get("cl1")
+        touch, touch_days = _first_touch(
+            highs, lows, float(tp1), float(cl1) if cl1 is not None else None, i, horizon
+        )
         sample += 1
         mfes.append(mfe)
         maes.append(mae)
-        if hit and hit_days is not None:
+        if touch == "TP":
             tp_hits += 1
-            days_list.append(hit_days)
+        elif touch == "CL":
+            cl_hits += 1
+        if touch_days is not None:
+            days_list.append(touch_days)
         elif days is not None:
             days_list.append(days)
 
     out["sample_size"] = sample
+    out["outcome_basis"] = OUTCOME_BASIS
+    out["skipped_incomplete_horizon"] = skipped_incomplete
+    out["skipped_data_gap"] = skipped_gap
     if sample < min_sample:
         out["stats_status"] = STATUS_INSUFFICIENT_SAMPLE
         out["stats_note"] = (
@@ -163,6 +208,7 @@ def compute_historical_stats(
             out["mfe"] = round(float(np.median(mfes)), 3)
             out["mae"] = round(float(np.median(maes)), 3)
             out["historical_tp_probability"] = round(100.0 * tp_hits / sample, 2)
+            out["historical_cl_probability"] = round(100.0 * cl_hits / sample, 2)
             if days_list:
                 out["median_days"] = round(float(np.median(days_list)), 2)
         return out
@@ -172,6 +218,7 @@ def compute_historical_stats(
     out["mfe"] = round(float(np.median(mfes)), 3)
     out["mae"] = round(float(np.median(maes)), 3)
     out["historical_tp_probability"] = round(100.0 * tp_hits / sample, 2)
+    out["historical_cl_probability"] = round(100.0 * cl_hits / sample, 2)
     if days_list:
         out["median_days"] = round(float(np.median(days_list)), 2)
     return out

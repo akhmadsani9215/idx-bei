@@ -108,12 +108,34 @@ class TestSyncAllOrchestration(unittest.TestCase):
         kwargs = mock_job.call_args.kwargs
         self.assertEqual(kwargs.get("job_type"), "sync_all")
 
-    @patch("idx.rebuild.rebuild_target_risk", return_value={"status": "SUCCESS", "records": 5, "warnings": [], "errors": [], "duration_sec": 0.1, "engine_version": "rebuild-1.0"})
-    @patch("idx.rebuild.rebuild_features", return_value={"status": "SUCCESS", "records": 5, "warnings": [], "errors": [], "duration_sec": 0.1, "engine_version": "rebuild-1.0"})
+    @patch(
+        "idx.rebuild.rebuild_target_risk",
+        return_value={
+            "status": "SUCCESS",
+            "records": 5,
+            "warnings": [],
+            "errors": [],
+            "duration_sec": 0.1,
+            "engine_version": "rebuild-1.0",
+        },
+    )
+    @patch(
+        "idx.rebuild.rebuild_features",
+        return_value={
+            "status": "SUCCESS",
+            "records": 5,
+            "warnings": [],
+            "errors": [],
+            "duration_sec": 0.1,
+            "engine_version": "rebuild-1.0",
+        },
+    )
     @patch("idx.ingestion.refresh_screener_snapshot", return_value={"status": "completed"})
     @patch("idx.signals.build_briefing", return_value={"radar_rows": 3, "shield_rows": 1})
     @patch("idx.pipelines.parquet.export_financial_ratios", return_value={"rows": 20})
-    @patch("idx.scrapers.financial.fetch_financial_ratios", return_value={"data": [{"code": "AAA"}]})
+    @patch(
+        "idx.scrapers.financial.fetch_financial_ratios", return_value={"data": [{"code": "AAA"}]}
+    )
     @patch("idx.pipelines.daily.ingest_daily", return_value=_ok_daily())
     def test_sync_all_success_path(self, *_mocks):
         result = run_sync_all_data()
@@ -136,8 +158,28 @@ class TestSyncAllOrchestration(unittest.TestCase):
         )
         self.assertIsInstance(by_id["market_eod"]["records"], int)
 
-    @patch("idx.rebuild.rebuild_target_risk", return_value={"status": "SUCCESS", "records": 2, "warnings": [], "errors": [], "duration_sec": 0.01, "engine_version": "rebuild-1.0"})
-    @patch("idx.rebuild.rebuild_features", return_value={"status": "SUCCESS", "records": 2, "warnings": [], "errors": [], "duration_sec": 0.01, "engine_version": "rebuild-1.0"})
+    @patch(
+        "idx.rebuild.rebuild_target_risk",
+        return_value={
+            "status": "SUCCESS",
+            "records": 2,
+            "warnings": [],
+            "errors": [],
+            "duration_sec": 0.01,
+            "engine_version": "rebuild-1.0",
+        },
+    )
+    @patch(
+        "idx.rebuild.rebuild_features",
+        return_value={
+            "status": "SUCCESS",
+            "records": 2,
+            "warnings": [],
+            "errors": [],
+            "duration_sec": 0.01,
+            "engine_version": "rebuild-1.0",
+        },
+    )
     @patch("idx.ingestion.refresh_screener_snapshot", return_value={"status": "completed"})
     @patch("idx.signals.build_briefing", return_value={"radar_rows": 2})
     @patch("idx.pipelines.parquet.export_financial_ratios", return_value={"rows": 5})
@@ -158,12 +200,34 @@ class TestSyncAllOrchestration(unittest.TestCase):
         self.assertEqual(result["overall_status"], "PARTIAL")
         self.assertTrue(by_id["financial"]["errors"])
 
-    @patch("idx.rebuild.rebuild_target_risk", return_value={"status": "SUCCESS", "records": 1, "warnings": [], "errors": [], "duration_sec": 0.01, "engine_version": "rebuild-1.0"})
-    @patch("idx.rebuild.rebuild_features", return_value={"status": "SUCCESS", "records": 1, "warnings": [], "errors": [], "duration_sec": 0.01, "engine_version": "rebuild-1.0"})
+    @patch(
+        "idx.rebuild.rebuild_target_risk",
+        return_value={
+            "status": "SUCCESS",
+            "records": 1,
+            "warnings": [],
+            "errors": [],
+            "duration_sec": 0.01,
+            "engine_version": "rebuild-1.0",
+        },
+    )
+    @patch(
+        "idx.rebuild.rebuild_features",
+        return_value={
+            "status": "SUCCESS",
+            "records": 1,
+            "warnings": [],
+            "errors": [],
+            "duration_sec": 0.01,
+            "engine_version": "rebuild-1.0",
+        },
+    )
     @patch("idx.ingestion.refresh_screener_snapshot", return_value={"status": "completed"})
     @patch("idx.signals.build_briefing", return_value={"radar_rows": 1})
     @patch("idx.pipelines.parquet.export_financial_ratios", return_value={"rows": 5})
-    @patch("idx.scrapers.financial.fetch_financial_ratios", return_value={"data": [{"code": "AAA"}]})
+    @patch(
+        "idx.scrapers.financial.fetch_financial_ratios", return_value={"data": [{"code": "AAA"}]}
+    )
     @patch("idx.pipelines.daily.ingest_daily", return_value=_ok_daily())
     def test_controlled_foreign_failure_keeps_market_success(self, *_mocks):
         result = run_sync_all_data(fail_pipelines={"foreign"})

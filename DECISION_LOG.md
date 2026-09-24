@@ -117,3 +117,76 @@ Settled product/architecture decisions only. No routine implementation detail.
 - **Decision:** Agents 1–7 engineering baseline is recorded as a **local commit only** (no push) when Product Owner requests checkpoint.
 - **Reason:** Preserve reviewable history without publishing until external decisions / hosting are ready.
 
+## 2026-09-23 — Signal Discovery & Validation Lab foundation (Agen 8 / Cluster 1)
+- **Decision:** Add `idx.signal_discovery` as contract/invariant layer only; do **not** create a second backtest engine. Continue to use `idx.backtest.run_backtest` and existing screener/Strategy Lab paths.
+- **Decision:** Discovery horizons use the Cluster-1 taxonomy (`INTRADAY` … `MULTIBAGGER_1_5Y`) mapped explicitly to screener TIMEFRAMES — do not duplicate CP/Swing/Long-Term modes.
+- **Decision:** Candidate lifecycle statuses are explicit (`DISCOVERED` … `PRODUCTION_CANDIDATE` + `REJECTED`/`INCONCLUSIVE`/`INSUFFICIENT_DATA`). BUY is never a status fallback and never emitted from insufficient/inconclusive/rejected states.
+- **Decision:** `PRODUCTION_CANDIDATE` requires successful OOS; `REJECTED` cannot jump to production without revalidation restart (`DISCOVERED`/`BACKTESTING`).
+- **Decision:** Reuse existing PIT/leakage guards; add only contract-level as_of/feature ordering invariants. Survivorship, fees/slippage in engine, walk-forward harness, and multiple-testing statistics remain deferred (documented gaps).
+- **Decision:** Offline `backtest_v3*` results are research artifacts — not profitability proof and not automatic production eligibility.
+- **Decision:** No new third-party backtest dependencies in Cluster 1; Deflated Sharpe / vectorbt noted as future references only.
+- **Decision:** Cluster 1 does not alter production screener rules, inject BUY signals, run brute-force discovery, or commit/push.
+
+## 2026-09-23 — Signal Discovery runner + trial registry (Agen 8 / Cluster 2)
+- **Decision:** Implement Stage-1 runner (`run_stage1_discovery`) + in-memory `TrialRegistry` under `idx.signal_discovery`; evaluation reuses `run_backtest` only.
+- **Decision:** Stage-1 is a fixed curated set of 7 families; unwired families and non-executable horizons return `INSUFFICIENT_DATA` — never invent features or silently remap horizons.
+- **Decision:** `max_trials` is mandatory; exceeding it records explicit `TRIAL_LIMIT_REACHED` (no silent truncation / no nested parameter grids).
+- **Decision:** Runner must not emit `PRODUCTION_CANDIDATE` / `PRODUCTION` / winner labels; inspection ranking may only say **candidate for further validation**.
+- **Decision:** Trials record `cost_model=NOT_CONFIGURED`, `slippage_model=NOT_CONFIGURED`, `survivorship_status=NOT_VALIDATED`; gross Close returns must not be labeled net tradable.
+- **Decision:** Missing metrics stay null/`NOT_AVAILABLE` (especially when sample=0); do not copy empty-engine zeros as performance proof.
+- **Decision:** Cluster 2 does not alter production screener behavior, does not wire BUY, does not claim profitability, and does not commit/push.
+
+## 2026-09-23 — OOS + walk-forward harness (Agen 8 / Cluster 3)
+- **Decision:** Add `idx.signal_discovery.validation` with explicit temporal windows (IS/VALIDATION/OOS); reject overlaps; forbid random shuffle; forbid silent period shrinking.
+- **Decision:** Expanding-window walk-forward with locked parameters; OOS/test must not retune parameters (new trial/version required if params change).
+- **Decision:** Default `min_sample` aligns with screener `MIN_HISTORICAL_SAMPLE` (30) as an **engineering gate**, not a scientific profitability threshold.
+- **Decision:** Metrics via `metrics_adapter` — MFE/MAE/TP/CL hit remain NOT_AVAILABLE unless engine supplies; never fake zeros; returns not net tradable.
+- **Decision:** Maximum Cluster 3 eligibility is `VALIDATED_FOR_RESEARCH`; never emit PRODUCTION / PRODUCTION_BUY / PRODUCTION_CANDIDATE from this harness.
+- **Decision:** Survivorship stays `NOT_VALIDATED`; cost/slippage stay `NOT_CONFIGURED`. Robustness dimensions prepared but not executed.
+- **Decision:** No new third-party dependencies; walk-forward / Deflated Sharpe concepts are references only.
+- **Decision:** Cluster 3 does not alter screener BUY rules, does not claim profitability, and does not commit/push.
+
+## 2026-09-23 — Cost/slippage, survivorship, robustness (Agen 8 / Cluster 4)
+- **Decision:** Costs are applied post-engine to the trade ledger (exact multiplicative net); `run_backtest` stays the single engine and stays gross.
+- **Decision:** No IDX fee/tax schedule or slippage value is hardcoded. Models are `NOT_CONFIGURED` (net `NOT_AVAILABLE`), `RESEARCH_ILLUSTRATIVE` (caller-chosen, never net tradable), or `CONFIGURED` (requires `source` + `as_of`). `return_is_net_tradable=true` only when both cost and slippage are `CONFIGURED`; execution feasibility stays NOT_MODELED.
+- **Decision:** Survivorship status is rule-based over six components; `VERIFIED` evidence requires `verified_by` + `source`; data observation can never upgrade status. Current data = `NOT_VALIDATED`.
+- **Decision:** Robustness runs on IS or VALIDATION only (OOS locked), one-at-a-time neighbours, all variants retained, mandatory variant budget (`TRIAL_LIMIT_REACHED`, no truncation). `ROBUST` requires ≥2 engine dimensions each with ≥2 evaluable neighbours, positive base, no sign flip, median degradation ≤50%, all neighbours evaluable. These are engineering heuristics, not significance tests. Cost sensitivity never contributes to `ROBUST`.
+- **Decision:** Walk-forward research gate requires every fold `OK` (one good fold is insufficient). `VALIDATED_FOR_RESEARCH` explicitly means data sufficiency + temporal integrity, not performance.
+- **Decision:** Multiple-testing bookkeeping only (trials by family/horizon, parameter variants, robustness variants); Deflated Sharpe / FDR remain `NOT_IMPLEMENTED`; no significance claims.
+- **Decision:** Cluster 4 does not alter screener BUY rules, does not claim profitability, does not change frontend, and does not commit/push.
+
+## 2026-09-23 — Core finish (Agen 8 / Clusters 5–15)
+- **Decision:** Data gaps > 14 calendar days split history into segments; no feature, history window, trade or screener outcome may span a gap. Bars before `start_date` may warm up features (PIT); trades stay inside the window.
+- **Decision:** Five Stage-1 technical families are added to the single engine as one fixed, documented rule each (`TECHNICAL_RULES`); rules are not tuned on results. The earlier "no new strategy" constraint is superseded for these research rules only.
+- **Decision:** Discovery uses a pre-registered protocol (`study.default_plan_for_local_data`) with explicit verdict rules; SURVIVES requires every check incl. baseline, stress-net OOS, all WF folds, ROBUST, DSR ≥ 0.95 and BH-FDR. Result 2026-09-23 and 2026-09-24 re-run: 0 survivors — accepted, nothing promoted.
+- **Decision:** Screener historical stats use complete, gap-free horizons and first-touch TP vs CL (CL wins same-bar ties). Screener rows carry `production_eligibility=NOT_VALIDATED` until a setup survives the protocol.
+- **Decision:** State-changing system routes require an operator token; production without `RITELINSIGHT_ADMIN_TOKEN` fails closed (503). Rate limiting and HSTS default on in production. No default Neo4j credential.
+- **Decision:** Ingestion jobs are serialized (409) because pipelines share data files.
+- **Decision:** SBOM/license inventory are generated from installed metadata and labelled NOT_LEGALLY_REVIEWED; NOTICE text still requires counsel.
+- **Decision:** `pandas`/`numpy` are declared runtime dependencies.
+
+## 2026-09-24 — Study re-run after gap fill + CA controls
+- **Decision:** Default backtest prices are exchange-reference adjusted (`Previous` vs prior Close). Trades whose hold spans a price-distorting CA (table ∪ sparse reference-price events) are excluded. Synthetic/garbage `Previous` (event density > 25%) is ignored.
+- **Decision:** Re-run the locked 2026-09-23 protocol on filled stock_summary (882 sessions, 0 gaps). Result: still **0 survivors** (FAILED 16, FRAGILE 2, INSUFFICIENT_DATA 10). Closest remain Swing 3–10D MOMENTUM (FRAGILE) and RELATIVE_STRENGTH (FRAGILE). Nothing promoted.
+- **Decision:** Do not re-tune Stage-1 families on this result. Next product work is UI & Product Finalization; next research blockers are a real cost model and survivorship-safe universe data.
+
+## 2026-09-24 — UI / Product coherence
+- **Decision:** Strategy Lab UI must surface the locked discovery study (`/api/strategy/research` + catalog `research_validation`) and never imply profitability from a single simulation run.
+- **Decision:** Screener UI/meta must show `production_eligibility=NOT_VALIDATED` explicitly; rows remain decision support.
+- **Decision:** Strategy Lab, Data Center, and Plan & Journal must not require the optional `network_alpha` dashboard blob to render.
+- **Decision:** No fee/slippage values or survivorship-safe claims are invented in the UI; labels stay NOT_CONFIGURED / NOT_VALIDATED.
+- **Decision:** Research conclusions (0 survivors; do not promote families) are frozen — UI documents them, does not alter them.
+
+## 2026-09-24 — Personal-use mode (commercial deferred)
+- **Decision:** Pause commercial publish blockers (NOTICE, IdP/TLS, data-rights counsel). Operator will use the stack privately.
+- **Decision:** Fill needed local datasets (broker_summary, index_summary, corporate actions, latest stock sessions) without waiting on commercial licensing.
+- **Decision:** Add `personal_operator_cost_model` / `personal_operator_slippage_model` as `CONFIGURED` with explicit personal provenance (Trading Plan–aligned 15/25 bps all-in + 5 bps/side assumption, as_of 2026-09-24). These are **not** named-broker quotes and must not be marketed as verified exchange fee schedules.
+- **Decision:** Locked discovery study protocol remains on RESEARCH_ILLUSTRATIVE stress cost; do not re-tune Stage-1 or promote families because personal models exist.
+
+## 2026-09-24 — Alpha Index MCP (external data tools)
+- **Decision:** Extend the existing `idx` stdio MCP (do not invent a second local MCP framework). Add tools that call Alpha Index OpenAPI endpoints only: `/stocks/broker-summary`, `/stocks/ohlcv`, `/foreign-flow`.
+- **Decision:** Auth is HTTP Bearer via `ALPHA_INDEX_API_KEY` (or `INDEXALPHA_API_KEY`); base URL `ALPHA_INDEX_BASE_URL` defaulting to `https://api.indexalpha.id`. Never hardcode secrets; `.env` remains gitignored.
+- **Decision:** Alpha Index is an **external** development/data tool — it must not silently overwrite local Parquet/historical SoT or change screener/backtest business rules.
+- **Decision:** Also register optional remote Cursor MCP entry `url: https://api.indexalpha.id/mcp` (vendor OAuth) alongside local `idx-bei` stdio for agent access.
+- **Decision:** No commit/push of credentials; live E2E against BBCA requires operator-supplied key or OAuth completion in Cursor.
+

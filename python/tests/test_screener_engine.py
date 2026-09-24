@@ -44,7 +44,7 @@ def _ohlcv(
     dates = pd.bdate_range("2025-01-02", periods=n)
     closes = []
     px = start
-    for i in range(n):
+    for _ in range(n):
         px = px + trend + float(rng.normal(0, 5))
         closes.append(max(50.0, px))
     closes = np.array(closes, dtype=float)
@@ -377,6 +377,8 @@ def test_run_screener_filters_and_pagination():
     assert out["meta"]["limit"] == 2
     assert len(out["results"]) <= 2
     assert "engine_version" in out["meta"]
+    assert out["meta"]["production_eligibility"] == "NOT_VALIDATED"
+    assert "NOT_VALIDATED" in out["meta"]["limitations"][0]
     assert out["meta"]["next_cursor"] in (None, 2) or out["meta"]["total_matched"] <= 2
 
 

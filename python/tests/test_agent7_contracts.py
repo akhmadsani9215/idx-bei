@@ -7,8 +7,8 @@ import math
 import pytest
 from fastapi.testclient import TestClient
 
-from idx.auth_session import clear_sessions_for_tests
 from idx import watchlist_store as wl
+from idx.auth_session import clear_sessions_for_tests
 
 
 @pytest.fixture

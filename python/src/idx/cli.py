@@ -6,6 +6,7 @@ Entry point for `idx` executable and `python cli.py`.
 
 import argparse
 import logging
+import sys
 
 import pandas as pd
 
@@ -204,6 +205,16 @@ def build_parser():
         "--take-profit", type=float, default=None, help="Take profit %% e.g. 15.0 for +15%%"
     )
 
+    sub.add_parser("sbom", help="Write CycloneDX SBOM + declared license inventory to docs/")
+
+    p_study = sub.add_parser(
+        "discovery-study",
+        help="Pre-registered multi-horizon signal discovery study (research only, no BUY)",
+    )
+    p_study.add_argument(
+        "--horizons", nargs="*", default=None, help="Subset of discovery horizons (default: all)"
+    )
+
     # 8. Knowledge Graph & UBO
     p_graph = sub.add_parser("graph", help="Neo4j UBO resolution & corporate network analysis")
     p_graph.add_argument("--ubo", metavar="TICKER", help="Resolve UBO hierarchy for ticker")
@@ -290,12 +301,20 @@ def build_parser():
         help="Display dataset inventory, calendar gaps, and tiered backfill recommendations",
     )
 
-
     sub.add_parser("all", help="Run all snapshot scrapers sequentially")
     return parser
 
 
+def _utf8_console() -> None:
+    """Windows consoles default to cp1252; output uses →/— and must not crash a run."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
+
+
 def main(argv=None):
+    _utf8_console()
     args = build_parser().parse_args(argv)
     cmd = args.command
 
@@ -432,8 +451,12 @@ def main(argv=None):
                     print(stealth["anomalies_df"].head(20).to_string(index=False))
 
     elif cmd == "parquet":
-        print("=== Exporting All Datasets to Parquet ===")
-        results = export_all_parquet()
+        print(
+            "=== Exporting All Datasets to Parquet"
+            + (" (incremental)" if args.incremental else "")
+            + " ==="
+        )
+        results = export_all_parquet(incremental=args.incremental)
         for name, info in results.items():
             if isinstance(info, dict) and "rows" in info:
                 print(f"  {name}: {info['rows']} rows → {info.get('size_mb', '?')} MB")
@@ -469,6 +492,46 @@ def main(argv=None):
     elif cmd == "daily":
         print(f"=== Daily Ingestion ({args.date or 'today'}) ===")
         ingest_daily(date=args.date)
+    elif cmd == "sbom":
+        import json
+        import os
+
+        from idx.sbom import REPO_ROOT, build_sbom, license_inventory_markdown
+
+        sbom = build_sbom()
+        docs = os.path.join(REPO_ROOT, "docs")
+        with open(os.path.join(docs, "SBOM.cdx.json"), "w", encoding="utf-8") as fh:
+            json.dump(sbom, fh, indent=2)
+        with open(
+            os.path.join(docs, "DEPENDENCY_LICENSE_INVENTORY.md"), "w", encoding="utf-8"
+        ) as fh:
+            fh.write(license_inventory_markdown(sbom))
+        print(f"SBOM components: {len(sbom['components'])} -> docs/SBOM.cdx.json")
+    elif cmd == "discovery-study":
+        import json
+        import os
+        from dataclasses import replace
+
+        from idx.backtest import _load_data
+        from idx.core.utils import DATA_DIR
+        from idx.signal_discovery.study import (
+            default_plan_for_local_data,
+            report_json_safe,
+            run_controlled_study,
+        )
+
+        plan = default_plan_for_local_data()
+        if args.horizons:
+            plan = replace(plan, horizons=tuple(args.horizons))
+        stock, ratios, actions = _load_data()
+        report = run_controlled_study(plan, stock, ratios, actions)
+        out_dir = os.path.join(DATA_DIR, "research")
+        os.makedirs(out_dir, exist_ok=True)
+        out_path = os.path.join(out_dir, f"discovery_study_{report['generated_at'][:10]}.json")
+        with open(out_path, "w", encoding="utf-8") as fh:
+            json.dump(report_json_safe(report), fh, indent=2, ensure_ascii=False, allow_nan=False)
+        print(f"Verdicts: {report['verdict_counts']}")
+        print(f"Engine runs: {report['engine_runs']} -> {out_path}")
     elif cmd == "backtest":
         from idx.backtest import run_backtest
 

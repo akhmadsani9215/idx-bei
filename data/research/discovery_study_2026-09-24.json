@@ -1,0 +1,5541 @@
+{
+  "study_version": "controlled-study-1.0",
+  "engine_version": "signal-discovery-4.0",
+  "strategy_version": "stage1-0.2.0",
+  "generated_at": "2026-09-24T02:31:30.987836+00:00",
+  "data_profile": {
+    "start": "2023-01-02",
+    "end": "2026-09-22",
+    "sessions": 882,
+    "tickers": 982,
+    "data_gaps": []
+  },
+  "survivorship": {
+    "status": "NOT_VALIDATED",
+    "observations": {
+      "date_range": {
+        "start": "2023-01-02",
+        "end": "2026-09-22"
+      },
+      "ticker_count": 982,
+      "tickers_last_seen_before_end": 19,
+      "tickers_last_seen_before_end_sample": [
+        "CNTB",
+        "CNTX",
+        "FORZ",
+        "FREN",
+        "HDTX",
+        "JKSW",
+        "KPAL",
+        "KPAS",
+        "KRAH",
+        "MAMI",
+        "MAMIP",
+        "MASA",
+        "MFIN",
+        "MYRX",
+        "MYRXP",
+        "NIPS",
+        "PRAS",
+        "RMBA",
+        "TURI"
+      ],
+      "tickers_first_seen_after_start": 154,
+      "corporate_actions_in_range": {
+        "dividenSaham": 7,
+        "gabungUsaha": 6,
+        "hmetd": 49,
+        "ipo": 77,
+        "kurangModal": 21,
+        "partialDelisting": 16,
+        "sahamBonus": 12,
+        "stockSplit": 38,
+        "tanpaHmetd": 42,
+        "waran": 117
+      },
+      "price_distorting_events_in_range": 133,
+      "full_delisting_records_in_range": 0
+    }
+  },
+  "protocol": {
+    "discovery": {
+      "start": "2025-01-02",
+      "end": "2025-10-31"
+    },
+    "validation": {
+      "start": "2025-11-01",
+      "end": "2026-03-31"
+    },
+    "oos": {
+      "start": "2026-04-01",
+      "end": "2026-09-22"
+    },
+    "walk_forward": {
+      "train_start": "2025-01-02",
+      "first_train_end": "2025-10-31",
+      "test_span_calendar_days": 60,
+      "step_calendar_days": 60,
+      "n_folds": 5
+    },
+    "parameters": {
+      "top_n": 10,
+      "min_turnover_rp": 1000000000
+    },
+    "price_basis": "EXCHANGE_REFERENCE_ADJUSTED",
+    "exclude_ca_events": true,
+    "min_sample": 30,
+    "robustness": "IS only; top_n [5,15]; min_turnover_rp [5e8,2e9]; holding ±max(1,h//4)",
+    "stress_cost": {
+      "model_id": "illustrative:stress-15-25",
+      "status": "RESEARCH_ILLUSTRATIVE",
+      "buy_fee_bps": 15,
+      "sell_fee_bps": 25,
+      "source": null,
+      "as_of": null,
+      "notes": "RESEARCH/ILLUSTRATIVE stress assumption — not an IDX fee schedule or measured fill"
+    },
+    "stress_slippage": {
+      "model_id": "illustrative:stress-10",
+      "status": "RESEARCH_ILLUSTRATIVE",
+      "per_side_bps": 10,
+      "source": null,
+      "as_of": null,
+      "notes": "RESEARCH/ILLUSTRATIVE stress assumption — not an IDX fee schedule or measured fill"
+    },
+    "fdr_alpha": 0.1,
+    "verdict_rules": {
+      "UNAVAILABLE": "horizon not executable with current data (no fabricated evaluation)",
+      "INSUFFICIENT_DATA": "any IS/VALIDATION/OOS phase below min_sample or outside coverage",
+      "FAILED": "OOS gross expectancy <= 0, or <= liquid-universe baseline, or OOS illustrative-net expectancy <= 0",
+      "FRAGILE": "IS robustness FRAGILE, or any evaluable walk-forward fold expectancy <= 0",
+      "SURVIVES_RESEARCH_VALIDATION": "VALIDATED_FOR_RESEARCH (all phases + all WF folds sample-sufficient) AND gross expectancy > 0 and > baseline in IS, VALIDATION and OOS AND OOS illustrative-net > 0 AND robustness ROBUST AND DSR PASS AND BH-FDR DISCOVERY",
+      "INCONCLUSIVE": "none of the above; reasons list the unmet SURVIVES checks"
+    }
+  },
+  "verdict_counts": {
+    "SURVIVES_RESEARCH_VALIDATION": 0,
+    "FAILED": 16,
+    "FRAGILE": 2,
+    "INCONCLUSIVE": 0,
+    "INSUFFICIENT_DATA": 10,
+    "UNAVAILABLE": 21
+  },
+  "trials": [
+    {
+      "trial_id": "study::s1_trend_composite::NEXT_DAY_1_3D",
+      "strategy_id": "s1_trend_composite",
+      "family": "TREND",
+      "hypothesis": "Composite alpha ranking with PIT trend/technical features identifies relative outperformers over the horizon holding window",
+      "entry_rule": "Top-N composite_alpha on entry_date (PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "NEXT_DAY_1_3D",
+      "holding_days": 2,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 968,
+          "gross_expectancy_pct": 0.03,
+          "illustrative_net_expectancy_pct": -0.5687,
+          "baseline_expectancy_pct": 0.3881,
+          "excess_vs_baseline_pct": -0.3581,
+          "win_rate_pct": 41.43,
+          "median_mfe_pct": 2.1181,
+          "median_mae_pct": -2.1105,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": 0.06,
+          "max_drawdown_pct": 28.51,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "OK",
+          "sample_count": 470,
+          "gross_expectancy_pct": 0.4928,
+          "illustrative_net_expectancy_pct": -0.1087,
+          "baseline_expectancy_pct": 0.0344,
+          "excess_vs_baseline_pct": 0.4584,
+          "win_rate_pct": 45.11,
+          "median_mfe_pct": 2.652,
+          "median_mae_pct": -1.967,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": 2.51,
+          "max_drawdown_pct": 22.92,
+          "failure_reason": null
+        },
+        "OOS": {
+          "status": "OK",
+          "sample_count": 570,
+          "gross_expectancy_pct": -0.1293,
+          "illustrative_net_expectancy_pct": -0.727,
+          "baseline_expectancy_pct": -0.1075,
+          "excess_vs_baseline_pct": -0.0218,
+          "win_rate_pct": 44.21,
+          "median_mfe_pct": 2.0778,
+          "median_mae_pct": -2.1192,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": -1.01,
+          "max_drawdown_pct": 27.83,
+          "failure_reason": null
+        }
+      },
+      "walk_forward_status": "OK",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "OK",
+          "sample_count": 190,
+          "gross_expectancy_pct": 1.3635
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "OK",
+          "sample_count": 180,
+          "gross_expectancy_pct": -0.3258
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "OK",
+          "sample_count": 180,
+          "gross_expectancy_pct": -0.1526
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "OK",
+          "sample_count": 170,
+          "gross_expectancy_pct": -1.7684
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "OK",
+          "sample_count": 200,
+          "gross_expectancy_pct": 0.4518
+        }
+      ],
+      "eligibility_status": "VALIDATED_FOR_RESEARCH",
+      "robustness_status": "FRAGILE",
+      "robustness_reasons": [
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 0.03,
+          "median_neighbor_metric": 0.0779,
+          "median_degradation": -1.5967,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "universe_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 0.03,
+          "median_neighbor_metric": 0.0503,
+          "median_degradation": -0.6767,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "horizon_sensitivity": {
+          "status": "FRAGILE",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 0.03,
+          "median_neighbor_metric": 0.1205,
+          "median_degradation": -3.015,
+          "sign_flip_count": 1,
+          "reasons": [
+            "1 evaluable neighbour(s) flip sign (<= 0)"
+          ]
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 201,
+        "mean": 0.000933,
+        "std": 0.024741,
+        "sharpe": 0.03771,
+        "skew": -0.496239,
+        "kurtosis": 5.101234,
+        "n_trials": 224,
+        "trial_sharpe_variance": 0.050548,
+        "expected_max_sharpe": 0.630049,
+        "dsr": 0.0,
+        "dsr_threshold": 0.95,
+        "status": "FAIL"
+      },
+      "fdr_decision": "NOT_SIGNIFICANT",
+      "verdict": "FAILED",
+      "verdict_reasons": [
+        "OOS gross expectancy <= 0",
+        "OOS expectancy not above liquid-universe baseline",
+        "OOS illustrative-net expectancy <= 0"
+      ]
+    },
+    {
+      "trial_id": "study::s1_momentum_standalone::NEXT_DAY_1_3D",
+      "strategy_id": "s1_momentum_standalone",
+      "family": "MOMENTUM",
+      "hypothesis": "Top trailing 20-session return among liquid names continues over the holding window",
+      "entry_rule": "liquid; rank by trailing 20-session Close return desc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "NEXT_DAY_1_3D",
+      "holding_days": 2,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 969,
+          "gross_expectancy_pct": 1.1905,
+          "illustrative_net_expectancy_pct": 0.5849,
+          "baseline_expectancy_pct": 0.3881,
+          "excess_vs_baseline_pct": 0.8024,
+          "win_rate_pct": 37.87,
+          "median_mfe_pct": 4.698,
+          "median_mae_pct": -9.9099,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": 3.71,
+          "max_drawdown_pct": 27.14,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "OK",
+          "sample_count": 470,
+          "gross_expectancy_pct": 1.7108,
+          "illustrative_net_expectancy_pct": 1.102,
+          "baseline_expectancy_pct": 0.0344,
+          "excess_vs_baseline_pct": 1.6764,
+          "win_rate_pct": 35.96,
+          "median_mfe_pct": 3.6559,
+          "median_mae_pct": -18.2179,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": 4.53,
+          "max_drawdown_pct": 36.74,
+          "failure_reason": null
+        },
+        "OOS": {
+          "status": "OK",
+          "sample_count": 568,
+          "gross_expectancy_pct": -0.3352,
+          "illustrative_net_expectancy_pct": -0.9317,
+          "baseline_expectancy_pct": -0.1075,
+          "excess_vs_baseline_pct": -0.2277,
+          "win_rate_pct": 39.08,
+          "median_mfe_pct": 5.0297,
+          "median_mae_pct": -8.6313,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": -1.28,
+          "max_drawdown_pct": 44.45,
+          "failure_reason": null
+        }
+      },
+      "walk_forward_status": "OK",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "OK",
+          "sample_count": 190,
+          "gross_expectancy_pct": 4.1402
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "OK",
+          "sample_count": 180,
+          "gross_expectancy_pct": 1.5889
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "OK",
+          "sample_count": 180,
+          "gross_expectancy_pct": -0.1179
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "OK",
+          "sample_count": 170,
+          "gross_expectancy_pct": -2.3553
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "OK",
+          "sample_count": 198,
+          "gross_expectancy_pct": 0.5877
+        }
+      ],
+      "eligibility_status": "VALIDATED_FOR_RESEARCH",
+      "robustness_status": "ROBUST",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 1.1905,
+          "median_neighbor_metric": 1.3333,
+          "median_degradation": -0.12,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "universe_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 1.1905,
+          "median_neighbor_metric": 1.4391,
+          "median_degradation": -0.2088,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "horizon_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 1.1905,
+          "median_neighbor_metric": 1.2287,
+          "median_degradation": -0.032,
+          "sign_flip_count": 0,
+          "reasons": []
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 201,
+        "mean": 0.008823,
+        "std": 0.050771,
+        "sharpe": 0.173778,
+        "skew": 0.039951,
+        "kurtosis": 3.053706,
+        "n_trials": 224,
+        "trial_sharpe_variance": 0.050548,
+        "expected_max_sharpe": 0.630049,
+        "dsr": 0.0,
+        "dsr_threshold": 0.95,
+        "status": "FAIL"
+      },
+      "fdr_decision": "NOT_SIGNIFICANT",
+      "verdict": "FAILED",
+      "verdict_reasons": [
+        "OOS gross expectancy <= 0",
+        "OOS expectancy not above liquid-universe baseline",
+        "OOS illustrative-net expectancy <= 0"
+      ]
+    },
+    {
+      "trial_id": "study::s1_breakout_structure::NEXT_DAY_1_3D",
+      "strategy_id": "s1_breakout_structure",
+      "family": "BREAKOUT",
+      "hypothesis": "Close above the prior 20-session high on expanding volume continues",
+      "entry_rule": "liquid; Close > prior 20-session High and VolRatio20 >= 1.5; rank VolRatio20 desc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "NEXT_DAY_1_3D",
+      "holding_days": 2,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 732,
+          "gross_expectancy_pct": 0.2604,
+          "illustrative_net_expectancy_pct": -0.3397,
+          "baseline_expectancy_pct": 0.3881,
+          "excess_vs_baseline_pct": -0.1277,
+          "win_rate_pct": 37.84,
+          "median_mfe_pct": 5.2845,
+          "median_mae_pct": -5.9512,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": -0.26,
+          "max_drawdown_pct": 58.03,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "OK",
+          "sample_count": 370,
+          "gross_expectancy_pct": 0.9932,
+          "illustrative_net_expectancy_pct": 0.3887,
+          "baseline_expectancy_pct": 0.0344,
+          "excess_vs_baseline_pct": 0.9588,
+          "win_rate_pct": 38.38,
+          "median_mfe_pct": 6.687,
+          "median_mae_pct": -6.7363,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": 0.94,
+          "max_drawdown_pct": 46.08,
+          "failure_reason": null
+        },
+        "OOS": {
+          "status": "OK",
+          "sample_count": 381,
+          "gross_expectancy_pct": -0.7864,
+          "illustrative_net_expectancy_pct": -1.3802,
+          "baseline_expectancy_pct": -0.1075,
+          "excess_vs_baseline_pct": -0.6789,
+          "win_rate_pct": 36.22,
+          "median_mfe_pct": 5.6338,
+          "median_mae_pct": -6.8493,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": -1.62,
+          "max_drawdown_pct": 44.15,
+          "failure_reason": null
+        }
+      },
+      "walk_forward_status": "OK",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "OK",
+          "sample_count": 181,
+          "gross_expectancy_pct": 2.796
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "OK",
+          "sample_count": 139,
+          "gross_expectancy_pct": 0.3576
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "OK",
+          "sample_count": 104,
+          "gross_expectancy_pct": -0.5863
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "OK",
+          "sample_count": 63,
+          "gross_expectancy_pct": -1.4608
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "OK",
+          "sample_count": 166,
+          "gross_expectancy_pct": -0.0357
+        }
+      ],
+      "eligibility_status": "VALIDATED_FOR_RESEARCH",
+      "robustness_status": "ROBUST",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 0.2604,
+          "median_neighbor_metric": 0.3078,
+          "median_degradation": -0.1818,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "universe_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 0.2604,
+          "median_neighbor_metric": 0.6609,
+          "median_degradation": -1.538,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "horizon_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 0.2604,
+          "median_neighbor_metric": 1.2787,
+          "median_degradation": -3.9103,
+          "sign_flip_count": 0,
+          "reasons": []
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 195,
+        "mean": -0.001014,
+        "std": 0.062143,
+        "sharpe": -0.016309,
+        "skew": -0.665166,
+        "kurtosis": 4.896904,
+        "n_trials": 224,
+        "trial_sharpe_variance": 0.050548,
+        "expected_max_sharpe": 0.630049,
+        "dsr": 0.0,
+        "dsr_threshold": 0.95,
+        "status": "FAIL"
+      },
+      "fdr_decision": "NOT_SIGNIFICANT",
+      "verdict": "FAILED",
+      "verdict_reasons": [
+        "OOS gross expectancy <= 0",
+        "OOS expectancy not above liquid-universe baseline",
+        "OOS illustrative-net expectancy <= 0"
+      ]
+    },
+    {
+      "trial_id": "study::s1_pullback_trend::NEXT_DAY_1_3D",
+      "strategy_id": "s1_pullback_trend",
+      "family": "PULLBACK",
+      "hypothesis": "Oversold RSI pullback inside an EMA20>EMA50 uptrend resumes the trend",
+      "entry_rule": "liquid; Close > EMA50 and EMA20 > EMA50 and RSI14 <= 40; rank RSI14 asc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "NEXT_DAY_1_3D",
+      "holding_days": 2,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 4,
+          "gross_expectancy_pct": 2.4182,
+          "illustrative_net_expectancy_pct": 1.8052,
+          "baseline_expectancy_pct": 0.3881,
+          "excess_vs_baseline_pct": 2.0301,
+          "win_rate_pct": 25.0,
+          "median_mfe_pct": 0.4495,
+          "median_mae_pct": -2.2492,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": 4.02,
+          "max_drawdown_pct": 6.65,
+          "failure_reason": "sample_count=4 < min_sample=30 (engineering gate)"
+        },
+        "VALIDATION": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 6,
+          "gross_expectancy_pct": -1.849,
+          "illustrative_net_expectancy_pct": -2.4364,
+          "baseline_expectancy_pct": 0.0344,
+          "excess_vs_baseline_pct": -1.8834,
+          "win_rate_pct": 33.33,
+          "median_mfe_pct": 6.5442,
+          "median_mae_pct": -1.8544,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": -2.2,
+          "max_drawdown_pct": 21.01,
+          "failure_reason": "sample_count=6 < min_sample=30 (engineering gate)"
+        },
+        "OOS": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null,
+          "illustrative_net_expectancy_pct": null,
+          "baseline_expectancy_pct": -0.1075,
+          "excess_vs_baseline_pct": null,
+          "win_rate_pct": null,
+          "median_mfe_pct": null,
+          "median_mae_pct": null,
+          "median_holding_sessions": null,
+          "sharpe_ratio": null,
+          "max_drawdown_pct": null,
+          "failure_reason": "sample_count=0 < min_sample=30 (engineering gate)"
+        }
+      },
+      "walk_forward_status": "INSUFFICIENT_DATA",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 2,
+          "gross_expectancy_pct": 0.9484
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 4,
+          "gross_expectancy_pct": -3.2477
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 1,
+          "gross_expectancy_pct": -4.0609
+        }
+      ],
+      "eligibility_status": "INSUFFICIENT_DATA",
+      "robustness_status": "INSUFFICIENT_DATA",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 0,
+          "base_metric": null,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "base variant not evaluable"
+          ]
+        },
+        "universe_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 0,
+          "base_metric": null,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "base variant not evaluable"
+          ]
+        },
+        "horizon_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 0,
+          "base_metric": null,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "base variant not evaluable"
+          ]
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 9,
+        "mean": 0.002257,
+        "std": 0.100331,
+        "sharpe": 0.022499,
+        "skew": -0.052017,
+        "kurtosis": 2.84025,
+        "n_trials": 224,
+        "trial_sharpe_variance": null,
+        "expected_max_sharpe": null,
+        "dsr": null,
+        "dsr_threshold": 0.95,
+        "status": "INSUFFICIENT_DATA",
+        "reason": "periods=9 < 20 or zero variance"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "INSUFFICIENT_DATA",
+      "verdict_reasons": [
+        "IS: INSUFFICIENT_DATA (sample_count=4 < min_sample=30 (engineering gate))",
+        "VALIDATION: INSUFFICIENT_DATA (sample_count=6 < min_sample=30 (engineering gate))",
+        "OOS: INSUFFICIENT_DATA (sample_count=0 < min_sample=30 (engineering gate))"
+      ]
+    },
+    {
+      "trial_id": "study::s1_mean_reversion::NEXT_DAY_1_3D",
+      "strategy_id": "s1_mean_reversion",
+      "family": "MEAN_REVERSION",
+      "hypothesis": "Close below the lower Bollinger band reverts toward the mean",
+      "entry_rule": "liquid; Close below lower Bollinger band (PctB < 0); rank PctB asc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "NEXT_DAY_1_3D",
+      "holding_days": 2,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 603,
+          "gross_expectancy_pct": 0.0475,
+          "illustrative_net_expectancy_pct": -0.5513,
+          "baseline_expectancy_pct": 0.3881,
+          "excess_vs_baseline_pct": -0.3406,
+          "win_rate_pct": 46.27,
+          "median_mfe_pct": 2.521,
+          "median_mae_pct": -2.4911,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": -1.45,
+          "max_drawdown_pct": 33.01,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "OK",
+          "sample_count": 334,
+          "gross_expectancy_pct": -0.4971,
+          "illustrative_net_expectancy_pct": -1.0926,
+          "baseline_expectancy_pct": 0.0344,
+          "excess_vs_baseline_pct": -0.5315,
+          "win_rate_pct": 48.2,
+          "median_mfe_pct": 3.1455,
+          "median_mae_pct": -3.2938,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": -2.76,
+          "max_drawdown_pct": 46.06,
+          "failure_reason": null
+        },
+        "OOS": {
+          "status": "OK",
+          "sample_count": 310,
+          "gross_expectancy_pct": -1.2556,
+          "illustrative_net_expectancy_pct": -1.8465,
+          "baseline_expectancy_pct": -0.1075,
+          "excess_vs_baseline_pct": -1.1481,
+          "win_rate_pct": 36.77,
+          "median_mfe_pct": 2.41,
+          "median_mae_pct": -3.619,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": -5.37,
+          "max_drawdown_pct": 69.27,
+          "failure_reason": null
+        }
+      },
+      "walk_forward_status": "OK",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "OK",
+          "sample_count": 130,
+          "gross_expectancy_pct": 0.395
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "OK",
+          "sample_count": 115,
+          "gross_expectancy_pct": -1.3122
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "OK",
+          "sample_count": 116,
+          "gross_expectancy_pct": -0.9666
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "OK",
+          "sample_count": 126,
+          "gross_expectancy_pct": -1.7697
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "OK",
+          "sample_count": 68,
+          "gross_expectancy_pct": 0.6122
+        }
+      ],
+      "eligibility_status": "VALIDATED_FOR_RESEARCH",
+      "robustness_status": "FRAGILE",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "FRAGILE",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 0.0475,
+          "median_neighbor_metric": -0.0393,
+          "median_degradation": 1.8284,
+          "sign_flip_count": 1,
+          "reasons": [
+            "1 evaluable neighbour(s) flip sign (<= 0)",
+            "median neighbour degrades 183% > 50%"
+          ]
+        },
+        "universe_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 0.0475,
+          "median_neighbor_metric": 0.13,
+          "median_degradation": -1.7379,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "horizon_sensitivity": {
+          "status": "FRAGILE",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 0.0475,
+          "median_neighbor_metric": -0.213,
+          "median_degradation": 5.4853,
+          "sign_flip_count": 2,
+          "reasons": [
+            "2 evaluable neighbour(s) flip sign (<= 0)",
+            "median neighbour degrades 549% > 50%"
+          ]
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 192,
+        "mean": -0.009514,
+        "std": 0.049361,
+        "sharpe": -0.192746,
+        "skew": -0.674187,
+        "kurtosis": 5.513703,
+        "n_trials": 224,
+        "trial_sharpe_variance": 0.050548,
+        "expected_max_sharpe": 0.630049,
+        "dsr": 0.0,
+        "dsr_threshold": 0.95,
+        "status": "FAIL"
+      },
+      "fdr_decision": "NOT_SIGNIFICANT",
+      "verdict": "FAILED",
+      "verdict_reasons": [
+        "OOS gross expectancy <= 0",
+        "OOS expectancy not above liquid-universe baseline",
+        "OOS illustrative-net expectancy <= 0"
+      ]
+    },
+    {
+      "trial_id": "study::s1_volume_expansion::NEXT_DAY_1_3D",
+      "strategy_id": "s1_volume_expansion",
+      "family": "VOLUME_EXPANSION",
+      "hypothesis": "Volume >= 2x its 20-session average in a bullish EMA regime confirms continuation",
+      "entry_rule": "liquid; bullish TrendRegime and VolRatio20 >= 2.0; rank VolRatio20 desc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "NEXT_DAY_1_3D",
+      "holding_days": 2,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 936,
+          "gross_expectancy_pct": -0.2723,
+          "illustrative_net_expectancy_pct": -0.8692,
+          "baseline_expectancy_pct": 0.3881,
+          "excess_vs_baseline_pct": -0.6604,
+          "win_rate_pct": 36.11,
+          "median_mfe_pct": 5.4241,
+          "median_mae_pct": -6.1305,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": -0.81,
+          "max_drawdown_pct": 49.8,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "OK",
+          "sample_count": 450,
+          "gross_expectancy_pct": -0.7952,
+          "illustrative_net_expectancy_pct": -1.3889,
+          "baseline_expectancy_pct": 0.0344,
+          "excess_vs_baseline_pct": -0.8296,
+          "win_rate_pct": 34.67,
+          "median_mfe_pct": 6.266,
+          "median_mae_pct": -7.3742,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": -3.2,
+          "max_drawdown_pct": 52.8,
+          "failure_reason": null
+        },
+        "OOS": {
+          "status": "OK",
+          "sample_count": 543,
+          "gross_expectancy_pct": -2.0901,
+          "illustrative_net_expectancy_pct": -2.6761,
+          "baseline_expectancy_pct": -0.1075,
+          "excess_vs_baseline_pct": -1.9826,
+          "win_rate_pct": 31.31,
+          "median_mfe_pct": 4.9645,
+          "median_mae_pct": -6.9767,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": -7.1,
+          "max_drawdown_pct": 78.59,
+          "failure_reason": null
+        }
+      },
+      "walk_forward_status": "OK",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "OK",
+          "sample_count": 190,
+          "gross_expectancy_pct": 0.1655
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "OK",
+          "sample_count": 177,
+          "gross_expectancy_pct": -0.4079
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "OK",
+          "sample_count": 163,
+          "gross_expectancy_pct": -1.7655
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "OK",
+          "sample_count": 145,
+          "gross_expectancy_pct": -4.6952
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "OK",
+          "sample_count": 194,
+          "gross_expectancy_pct": -0.0488
+        }
+      ],
+      "eligibility_status": "VALIDATED_FOR_RESEARCH",
+      "robustness_status": "INCONCLUSIVE",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "INCONCLUSIVE",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": -0.2723,
+          "median_neighbor_metric": -0.4061,
+          "median_degradation": null,
+          "sign_flip_count": 2,
+          "reasons": [
+            "base metric <= 0 — no positive effect whose stability can be assessed"
+          ]
+        },
+        "universe_sensitivity": {
+          "status": "INCONCLUSIVE",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": -0.2723,
+          "median_neighbor_metric": -0.3429,
+          "median_degradation": null,
+          "sign_flip_count": 2,
+          "reasons": [
+            "base metric <= 0 — no positive effect whose stability can be assessed"
+          ]
+        },
+        "horizon_sensitivity": {
+          "status": "INCONCLUSIVE",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": -0.2723,
+          "median_neighbor_metric": 0.2105,
+          "median_degradation": null,
+          "sign_flip_count": 1,
+          "reasons": [
+            "base metric <= 0 — no positive effect whose stability can be assessed"
+          ]
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 201,
+        "mean": -0.01053,
+        "std": 0.053274,
+        "sharpe": -0.197664,
+        "skew": -0.054477,
+        "kurtosis": 3.305101,
+        "n_trials": 224,
+        "trial_sharpe_variance": 0.050548,
+        "expected_max_sharpe": 0.630049,
+        "dsr": 0.0,
+        "dsr_threshold": 0.95,
+        "status": "FAIL"
+      },
+      "fdr_decision": "NOT_SIGNIFICANT",
+      "verdict": "FAILED",
+      "verdict_reasons": [
+        "OOS gross expectancy <= 0",
+        "OOS expectancy not above liquid-universe baseline",
+        "OOS illustrative-net expectancy <= 0"
+      ]
+    },
+    {
+      "trial_id": "study::s1_relative_strength_foreign::NEXT_DAY_1_3D",
+      "strategy_id": "s1_relative_strength_foreign",
+      "family": "RELATIVE_STRENGTH",
+      "hypothesis": "Positive foreign net flow ranks as relative-strength proxy for forward holding returns",
+      "entry_rule": "Top-N foreign_flow radar on entry_date (PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "NEXT_DAY_1_3D",
+      "holding_days": 2,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 969,
+          "gross_expectancy_pct": 1.3966,
+          "illustrative_net_expectancy_pct": 0.7898,
+          "baseline_expectancy_pct": 0.3881,
+          "excess_vs_baseline_pct": 1.0085,
+          "win_rate_pct": 46.13,
+          "median_mfe_pct": 4.1667,
+          "median_mae_pct": -3.7267,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": 5.5,
+          "max_drawdown_pct": 25.7,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "OK",
+          "sample_count": 470,
+          "gross_expectancy_pct": 1.2574,
+          "illustrative_net_expectancy_pct": 0.6513,
+          "baseline_expectancy_pct": 0.0344,
+          "excess_vs_baseline_pct": 1.223,
+          "win_rate_pct": 43.62,
+          "median_mfe_pct": 5.3595,
+          "median_mae_pct": -4.9201,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": 3.33,
+          "max_drawdown_pct": 38.4,
+          "failure_reason": null
+        },
+        "OOS": {
+          "status": "OK",
+          "sample_count": 569,
+          "gross_expectancy_pct": -0.0081,
+          "illustrative_net_expectancy_pct": -0.6065,
+          "baseline_expectancy_pct": -0.1075,
+          "excess_vs_baseline_pct": 0.0994,
+          "win_rate_pct": 43.94,
+          "median_mfe_pct": 4.3478,
+          "median_mae_pct": -3.9735,
+          "median_holding_sessions": 2.0,
+          "sharpe_ratio": -0.11,
+          "max_drawdown_pct": 32.86,
+          "failure_reason": null
+        }
+      },
+      "walk_forward_status": "OK",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "OK",
+          "sample_count": 190,
+          "gross_expectancy_pct": 2.4529
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "OK",
+          "sample_count": 180,
+          "gross_expectancy_pct": 1.3005
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "OK",
+          "sample_count": 180,
+          "gross_expectancy_pct": 0.4543
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "OK",
+          "sample_count": 170,
+          "gross_expectancy_pct": -1.6765
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "OK",
+          "sample_count": 198,
+          "gross_expectancy_pct": 0.477
+        }
+      ],
+      "eligibility_status": "VALIDATED_FOR_RESEARCH",
+      "robustness_status": "ROBUST",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 1.3966,
+          "median_neighbor_metric": 1.3771,
+          "median_degradation": 0.014,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "universe_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 1.3966,
+          "median_neighbor_metric": 1.2742,
+          "median_degradation": 0.0876,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "horizon_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 1.3966,
+          "median_neighbor_metric": 1.0171,
+          "median_degradation": 0.2717,
+          "sign_flip_count": 0,
+          "reasons": []
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 201,
+        "mean": 0.009652,
+        "std": 0.044992,
+        "sharpe": 0.214537,
+        "skew": -0.000504,
+        "kurtosis": 3.471524,
+        "n_trials": 224,
+        "trial_sharpe_variance": 0.050548,
+        "expected_max_sharpe": 0.630049,
+        "dsr": 0.0,
+        "dsr_threshold": 0.95,
+        "status": "FAIL"
+      },
+      "fdr_decision": "NOT_SIGNIFICANT",
+      "verdict": "FAILED",
+      "verdict_reasons": [
+        "OOS gross expectancy <= 0",
+        "OOS illustrative-net expectancy <= 0"
+      ]
+    },
+    {
+      "trial_id": "study::s1_trend_composite::SWING_3_10D",
+      "strategy_id": "s1_trend_composite",
+      "family": "TREND",
+      "hypothesis": "Composite alpha ranking with PIT trend/technical features identifies relative outperformers over the horizon holding window",
+      "entry_rule": "Top-N composite_alpha on entry_date (PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "SWING_3_10D",
+      "holding_days": 7,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 268,
+          "gross_expectancy_pct": 0.8646,
+          "illustrative_net_expectancy_pct": 0.2609,
+          "baseline_expectancy_pct": 1.4245,
+          "excess_vs_baseline_pct": -0.5599,
+          "win_rate_pct": 42.16,
+          "median_mfe_pct": 3.8911,
+          "median_mae_pct": -4.2743,
+          "median_holding_sessions": 7.0,
+          "sharpe_ratio": 3.59,
+          "max_drawdown_pct": 12.91,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "OK",
+          "sample_count": 130,
+          "gross_expectancy_pct": 1.9738,
+          "illustrative_net_expectancy_pct": 1.3635,
+          "baseline_expectancy_pct": 0.3689,
+          "excess_vs_baseline_pct": 1.6049,
+          "win_rate_pct": 49.23,
+          "median_mfe_pct": 5.2065,
+          "median_mae_pct": -4.077,
+          "median_holding_sessions": 7.0,
+          "sharpe_ratio": 3.9,
+          "max_drawdown_pct": 15.38,
+          "failure_reason": null
+        },
+        "OOS": {
+          "status": "OK",
+          "sample_count": 160,
+          "gross_expectancy_pct": -0.0536,
+          "illustrative_net_expectancy_pct": -0.6518,
+          "baseline_expectancy_pct": -0.1462,
+          "excess_vs_baseline_pct": 0.0926,
+          "win_rate_pct": 44.38,
+          "median_mfe_pct": 3.9463,
+          "median_mae_pct": -4.3245,
+          "median_holding_sessions": 7.0,
+          "sharpe_ratio": -0.22,
+          "max_drawdown_pct": 23.91,
+          "failure_reason": null
+        }
+      },
+      "walk_forward_status": "OK",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "OK",
+          "sample_count": 50,
+          "gross_expectancy_pct": 5.128
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "OK",
+          "sample_count": 50,
+          "gross_expectancy_pct": -0.9487
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "OK",
+          "sample_count": 50,
+          "gross_expectancy_pct": -0.9616
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "OK",
+          "sample_count": 40,
+          "gross_expectancy_pct": -2.1096
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "OK",
+          "sample_count": 50,
+          "gross_expectancy_pct": 2.684
+        }
+      ],
+      "eligibility_status": "VALIDATED_FOR_RESEARCH",
+      "robustness_status": "ROBUST",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 0.8646,
+          "median_neighbor_metric": 0.6532,
+          "median_degradation": 0.2445,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "universe_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 0.8646,
+          "median_neighbor_metric": 1.1986,
+          "median_degradation": -0.3863,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "horizon_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 0.8646,
+          "median_neighbor_metric": 0.5829,
+          "median_degradation": 0.3258,
+          "sign_flip_count": 0,
+          "reasons": []
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 56,
+        "mean": 0.008839,
+        "std": 0.054649,
+        "sharpe": 0.161745,
+        "skew": 0.633304,
+        "kurtosis": 5.186871,
+        "n_trials": 224,
+        "trial_sharpe_variance": 0.050548,
+        "expected_max_sharpe": 0.630049,
+        "dsr": 0.000152,
+        "dsr_threshold": 0.95,
+        "status": "FAIL"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "FAILED",
+      "verdict_reasons": [
+        "OOS gross expectancy <= 0",
+        "OOS illustrative-net expectancy <= 0"
+      ]
+    },
+    {
+      "trial_id": "study::s1_momentum_standalone::SWING_3_10D",
+      "strategy_id": "s1_momentum_standalone",
+      "family": "MOMENTUM",
+      "hypothesis": "Top trailing 20-session return among liquid names continues over the holding window",
+      "entry_rule": "liquid; rank by trailing 20-session Close return desc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "SWING_3_10D",
+      "holding_days": 7,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 268,
+          "gross_expectancy_pct": 5.1321,
+          "illustrative_net_expectancy_pct": 4.5029,
+          "baseline_expectancy_pct": 1.4245,
+          "excess_vs_baseline_pct": 3.7076,
+          "win_rate_pct": 45.9,
+          "median_mfe_pct": 9.8473,
+          "median_mae_pct": -22.8106,
+          "median_holding_sessions": 7.0,
+          "sharpe_ratio": 6.74,
+          "max_drawdown_pct": 15.57,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "OK",
+          "sample_count": 130,
+          "gross_expectancy_pct": 7.9441,
+          "illustrative_net_expectancy_pct": 7.298,
+          "baseline_expectancy_pct": 0.3689,
+          "excess_vs_baseline_pct": 7.5752,
+          "win_rate_pct": 47.69,
+          "median_mfe_pct": 9.8899,
+          "median_mae_pct": -55.0082,
+          "median_holding_sessions": 7.0,
+          "sharpe_ratio": 6.89,
+          "max_drawdown_pct": 24.55,
+          "failure_reason": null
+        },
+        "OOS": {
+          "status": "OK",
+          "sample_count": 160,
+          "gross_expectancy_pct": 0.9166,
+          "illustrative_net_expectancy_pct": 0.3126,
+          "baseline_expectancy_pct": -0.1462,
+          "excess_vs_baseline_pct": 1.0628,
+          "win_rate_pct": 41.25,
+          "median_mfe_pct": 11.3269,
+          "median_mae_pct": -16.7334,
+          "median_holding_sessions": 7.0,
+          "sharpe_ratio": 1.56,
+          "max_drawdown_pct": 34.83,
+          "failure_reason": null
+        }
+      },
+      "walk_forward_status": "OK",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "OK",
+          "sample_count": 50,
+          "gross_expectancy_pct": 14.961
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "OK",
+          "sample_count": 50,
+          "gross_expectancy_pct": 3.4698
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "OK",
+          "sample_count": 49,
+          "gross_expectancy_pct": -2.5069
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "OK",
+          "sample_count": 40,
+          "gross_expectancy_pct": -7.7572
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "OK",
+          "sample_count": 48,
+          "gross_expectancy_pct": 3.7543
+        }
+      ],
+      "eligibility_status": "VALIDATED_FOR_RESEARCH",
+      "robustness_status": "ROBUST",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 5.1321,
+          "median_neighbor_metric": 4.9527,
+          "median_degradation": 0.035,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "universe_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 5.1321,
+          "median_neighbor_metric": 3.9806,
+          "median_degradation": 0.2244,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "horizon_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 5.1321,
+          "median_neighbor_metric": 3.5903,
+          "median_degradation": 0.3004,
+          "sign_flip_count": 0,
+          "reasons": []
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 56,
+        "mean": 0.045526,
+        "std": 0.129941,
+        "sharpe": 0.350356,
+        "skew": 0.769371,
+        "kurtosis": 4.021535,
+        "n_trials": 224,
+        "trial_sharpe_variance": 0.050548,
+        "expected_max_sharpe": 0.630049,
+        "dsr": 0.01112,
+        "dsr_threshold": 0.95,
+        "status": "FAIL"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "FRAGILE",
+      "verdict_reasons": [
+        "walk-forward fold with expectancy <= 0"
+      ]
+    },
+    {
+      "trial_id": "study::s1_breakout_structure::SWING_3_10D",
+      "strategy_id": "s1_breakout_structure",
+      "family": "BREAKOUT",
+      "hypothesis": "Close above the prior 20-session high on expanding volume continues",
+      "entry_rule": "liquid; Close > prior 20-session High and VolRatio20 >= 1.5; rank VolRatio20 desc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "SWING_3_10D",
+      "holding_days": 7,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 204,
+          "gross_expectancy_pct": 1.8821,
+          "illustrative_net_expectancy_pct": 1.2724,
+          "baseline_expectancy_pct": 1.4245,
+          "excess_vs_baseline_pct": 0.4576,
+          "win_rate_pct": 39.22,
+          "median_mfe_pct": 8.3231,
+          "median_mae_pct": -11.6824,
+          "median_holding_sessions": 7.0,
+          "sharpe_ratio": 2.84,
+          "max_drawdown_pct": 25.51,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "OK",
+          "sample_count": 105,
+          "gross_expectancy_pct": 3.3404,
+          "illustrative_net_expectancy_pct": 2.7219,
+          "baseline_expectancy_pct": 0.3689,
+          "excess_vs_baseline_pct": 2.9715,
+          "win_rate_pct": 39.05,
+          "median_mfe_pct": 12.4031,
+          "median_mae_pct": -11.1111,
+          "median_holding_sessions": 7.0,
+          "sharpe_ratio": 4.69,
+          "max_drawdown_pct": 22.47,
+          "failure_reason": null
+        },
+        "OOS": {
+          "status": "OK",
+          "sample_count": 105,
+          "gross_expectancy_pct": -1.9223,
+          "illustrative_net_expectancy_pct": -2.5093,
+          "baseline_expectancy_pct": -0.1462,
+          "excess_vs_baseline_pct": -1.7761,
+          "win_rate_pct": 39.05,
+          "median_mfe_pct": 7.767,
+          "median_mae_pct": -9.2965,
+          "median_holding_sessions": 7.0,
+          "sharpe_ratio": -6.89,
+          "max_drawdown_pct": 41.04,
+          "failure_reason": null
+        }
+      },
+      "walk_forward_status": "PARTIAL",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "OK",
+          "sample_count": 47,
+          "gross_expectancy_pct": 7.4097
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "OK",
+          "sample_count": 41,
+          "gross_expectancy_pct": -3.9578
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "OK",
+          "sample_count": 34,
+          "gross_expectancy_pct": -3.0781
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 15,
+          "gross_expectancy_pct": -6.8238
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "OK",
+          "sample_count": 32,
+          "gross_expectancy_pct": 1.3968
+        }
+      ],
+      "eligibility_status": "INCONCLUSIVE",
+      "robustness_status": "ROBUST",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 1.8821,
+          "median_neighbor_metric": 2.0186,
+          "median_degradation": -0.0725,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "universe_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 1.8821,
+          "median_neighbor_metric": 1.7389,
+          "median_degradation": 0.0761,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "horizon_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 1.8821,
+          "median_neighbor_metric": 2.8211,
+          "median_degradation": -0.4989,
+          "sign_flip_count": 0,
+          "reasons": []
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 53,
+        "mean": 0.004062,
+        "std": 0.105491,
+        "sharpe": 0.038502,
+        "skew": 0.266256,
+        "kurtosis": 5.523309,
+        "n_trials": 224,
+        "trial_sharpe_variance": 0.050548,
+        "expected_max_sharpe": 0.630049,
+        "dsr": 9e-06,
+        "dsr_threshold": 0.95,
+        "status": "FAIL"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "FAILED",
+      "verdict_reasons": [
+        "OOS gross expectancy <= 0",
+        "OOS expectancy not above liquid-universe baseline",
+        "OOS illustrative-net expectancy <= 0"
+      ]
+    },
+    {
+      "trial_id": "study::s1_pullback_trend::SWING_3_10D",
+      "strategy_id": "s1_pullback_trend",
+      "family": "PULLBACK",
+      "hypothesis": "Oversold RSI pullback inside an EMA20>EMA50 uptrend resumes the trend",
+      "entry_rule": "liquid; Close > EMA50 and EMA20 > EMA50 and RSI14 <= 40; rank RSI14 asc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "SWING_3_10D",
+      "holding_days": 7,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null,
+          "illustrative_net_expectancy_pct": null,
+          "baseline_expectancy_pct": 1.4245,
+          "excess_vs_baseline_pct": null,
+          "win_rate_pct": null,
+          "median_mfe_pct": null,
+          "median_mae_pct": null,
+          "median_holding_sessions": null,
+          "sharpe_ratio": null,
+          "max_drawdown_pct": null,
+          "failure_reason": "sample_count=0 < min_sample=30 (engineering gate)"
+        },
+        "VALIDATION": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 4,
+          "gross_expectancy_pct": -10.6615,
+          "illustrative_net_expectancy_pct": -11.1962,
+          "baseline_expectancy_pct": 0.3689,
+          "excess_vs_baseline_pct": -11.0304,
+          "win_rate_pct": 50.0,
+          "median_mfe_pct": 12.6329,
+          "median_mae_pct": -28.2786,
+          "median_holding_sessions": 7.0,
+          "sharpe_ratio": -8.09,
+          "max_drawdown_pct": 40.58,
+          "failure_reason": "sample_count=4 < min_sample=30 (engineering gate)"
+        },
+        "OOS": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null,
+          "illustrative_net_expectancy_pct": null,
+          "baseline_expectancy_pct": -0.1462,
+          "excess_vs_baseline_pct": null,
+          "win_rate_pct": null,
+          "median_mfe_pct": null,
+          "median_mae_pct": null,
+          "median_holding_sessions": null,
+          "sharpe_ratio": null,
+          "max_drawdown_pct": null,
+          "failure_reason": "sample_count=0 < min_sample=30 (engineering gate)"
+        }
+      },
+      "walk_forward_status": "INSUFFICIENT_DATA",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        }
+      ],
+      "eligibility_status": "INSUFFICIENT_DATA",
+      "robustness_status": "INSUFFICIENT_DATA",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 0,
+          "base_metric": null,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "base variant not evaluable"
+          ]
+        },
+        "universe_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 0,
+          "base_metric": null,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "base variant not evaluable"
+          ]
+        },
+        "horizon_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 0,
+          "base_metric": null,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "base variant not evaluable"
+          ]
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 3,
+        "mean": -0.113818,
+        "std": 0.223821,
+        "sharpe": -0.508521,
+        "skew": -0.23256,
+        "kurtosis": 1.5,
+        "n_trials": 224,
+        "trial_sharpe_variance": null,
+        "expected_max_sharpe": null,
+        "dsr": null,
+        "dsr_threshold": 0.95,
+        "status": "INSUFFICIENT_DATA",
+        "reason": "periods=3 < 20 or zero variance"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "INSUFFICIENT_DATA",
+      "verdict_reasons": [
+        "IS: INSUFFICIENT_DATA (sample_count=0 < min_sample=30 (engineering gate))",
+        "VALIDATION: INSUFFICIENT_DATA (sample_count=4 < min_sample=30 (engineering gate))",
+        "OOS: INSUFFICIENT_DATA (sample_count=0 < min_sample=30 (engineering gate))"
+      ]
+    },
+    {
+      "trial_id": "study::s1_mean_reversion::SWING_3_10D",
+      "strategy_id": "s1_mean_reversion",
+      "family": "MEAN_REVERSION",
+      "hypothesis": "Close below the lower Bollinger band reverts toward the mean",
+      "entry_rule": "liquid; Close below lower Bollinger band (PctB < 0); rank PctB asc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "SWING_3_10D",
+      "holding_days": 7,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 147,
+          "gross_expectancy_pct": -1.0572,
+          "illustrative_net_expectancy_pct": -1.6493,
+          "baseline_expectancy_pct": 1.4245,
+          "excess_vs_baseline_pct": -2.4817,
+          "win_rate_pct": 43.54,
+          "median_mfe_pct": 3.7736,
+          "median_mae_pct": -4.6784,
+          "median_holding_sessions": 7.0,
+          "sharpe_ratio": -4.82,
+          "max_drawdown_pct": 49.24,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "OK",
+          "sample_count": 99,
+          "gross_expectancy_pct": -1.0755,
+          "illustrative_net_expectancy_pct": -1.6676,
+          "baseline_expectancy_pct": 0.3689,
+          "excess_vs_baseline_pct": -1.4444,
+          "win_rate_pct": 44.44,
+          "median_mfe_pct": 5.3812,
+          "median_mae_pct": -5.9305,
+          "median_holding_sessions": 7.0,
+          "sharpe_ratio": -4.17,
+          "max_drawdown_pct": 25.71,
+          "failure_reason": null
+        },
+        "OOS": {
+          "status": "OK",
+          "sample_count": 89,
+          "gross_expectancy_pct": -0.2919,
+          "illustrative_net_expectancy_pct": -0.8887,
+          "baseline_expectancy_pct": -0.1462,
+          "excess_vs_baseline_pct": -0.1457,
+          "win_rate_pct": 44.94,
+          "median_mfe_pct": 5.1163,
+          "median_mae_pct": -5.8219,
+          "median_holding_sessions": 7.0,
+          "sharpe_ratio": -4.68,
+          "max_drawdown_pct": 50.09,
+          "failure_reason": null
+        }
+      },
+      "walk_forward_status": "PARTIAL",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "OK",
+          "sample_count": 33,
+          "gross_expectancy_pct": -0.5586
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "OK",
+          "sample_count": 35,
+          "gross_expectancy_pct": -4.1886
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 28,
+          "gross_expectancy_pct": -5.5064
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "OK",
+          "sample_count": 40,
+          "gross_expectancy_pct": -3.4718
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 16,
+          "gross_expectancy_pct": 4.9002
+        }
+      ],
+      "eligibility_status": "INCONCLUSIVE",
+      "robustness_status": "INCONCLUSIVE",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "INCONCLUSIVE",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": -1.0572,
+          "median_neighbor_metric": -1.3216,
+          "median_degradation": null,
+          "sign_flip_count": 2,
+          "reasons": [
+            "base metric <= 0 — no positive effect whose stability can be assessed"
+          ]
+        },
+        "universe_sensitivity": {
+          "status": "INCONCLUSIVE",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": -1.0572,
+          "median_neighbor_metric": -0.6321,
+          "median_degradation": null,
+          "sign_flip_count": 2,
+          "reasons": [
+            "base metric <= 0 — no positive effect whose stability can be assessed"
+          ]
+        },
+        "horizon_sensitivity": {
+          "status": "INCONCLUSIVE",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": -1.0572,
+          "median_neighbor_metric": 0.6103,
+          "median_degradation": null,
+          "sign_flip_count": 0,
+          "reasons": [
+            "base metric <= 0 — no positive effect whose stability can be assessed"
+          ]
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 53,
+        "mean": -0.025194,
+        "std": 0.090059,
+        "sharpe": -0.279752,
+        "skew": -1.156126,
+        "kurtosis": 5.200693,
+        "n_trials": 224,
+        "trial_sharpe_variance": 0.050548,
+        "expected_max_sharpe": 0.630049,
+        "dsr": 0.0,
+        "dsr_threshold": 0.95,
+        "status": "FAIL"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "FAILED",
+      "verdict_reasons": [
+        "OOS gross expectancy <= 0",
+        "OOS expectancy not above liquid-universe baseline",
+        "OOS illustrative-net expectancy <= 0"
+      ]
+    },
+    {
+      "trial_id": "study::s1_volume_expansion::SWING_3_10D",
+      "strategy_id": "s1_volume_expansion",
+      "family": "VOLUME_EXPANSION",
+      "hypothesis": "Volume >= 2x its 20-session average in a bullish EMA regime confirms continuation",
+      "entry_rule": "liquid; bullish TrendRegime and VolRatio20 >= 2.0; rank VolRatio20 desc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "SWING_3_10D",
+      "holding_days": 7,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 269,
+          "gross_expectancy_pct": 1.0926,
+          "illustrative_net_expectancy_pct": 0.4876,
+          "baseline_expectancy_pct": 1.4245,
+          "excess_vs_baseline_pct": -0.3319,
+          "win_rate_pct": 38.66,
+          "median_mfe_pct": 8.2192,
+          "median_mae_pct": -11.5741,
+          "median_holding_sessions": 7.0,
+          "sharpe_ratio": 2.05,
+          "max_drawdown_pct": 33.35,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "OK",
+          "sample_count": 126,
+          "gross_expectancy_pct": 0.7736,
+          "illustrative_net_expectancy_pct": 0.1704,
+          "baseline_expectancy_pct": 0.3689,
+          "excess_vs_baseline_pct": 0.4047,
+          "win_rate_pct": 34.92,
+          "median_mfe_pct": 10.3485,
+          "median_mae_pct": -12.6698,
+          "median_holding_sessions": 7.0,
+          "sharpe_ratio": 0.91,
+          "max_drawdown_pct": 33.18,
+          "failure_reason": null
+        },
+        "OOS": {
+          "status": "OK",
+          "sample_count": 146,
+          "gross_expectancy_pct": -1.7991,
+          "illustrative_net_expectancy_pct": -2.3869,
+          "baseline_expectancy_pct": -0.1462,
+          "excess_vs_baseline_pct": -1.6529,
+          "win_rate_pct": 39.73,
+          "median_mfe_pct": 10.5729,
+          "median_mae_pct": -9.7997,
+          "median_holding_sessions": 7.0,
+          "sharpe_ratio": -3.87,
+          "max_drawdown_pct": 51.41,
+          "failure_reason": null
+        }
+      },
+      "walk_forward_status": "OK",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "OK",
+          "sample_count": 50,
+          "gross_expectancy_pct": 4.6903
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "OK",
+          "sample_count": 47,
+          "gross_expectancy_pct": -7.4084
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "OK",
+          "sample_count": 47,
+          "gross_expectancy_pct": -5.378
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "OK",
+          "sample_count": 35,
+          "gross_expectancy_pct": -10.9362
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "OK",
+          "sample_count": 45,
+          "gross_expectancy_pct": 1.1197
+        }
+      ],
+      "eligibility_status": "VALIDATED_FOR_RESEARCH",
+      "robustness_status": "FRAGILE",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "FRAGILE",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 1.0926,
+          "median_neighbor_metric": -0.2423,
+          "median_degradation": 1.2217,
+          "sign_flip_count": 1,
+          "reasons": [
+            "1 evaluable neighbour(s) flip sign (<= 0)",
+            "median neighbour degrades 122% > 50%"
+          ]
+        },
+        "universe_sensitivity": {
+          "status": "FRAGILE",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 1.0926,
+          "median_neighbor_metric": -0.5352,
+          "median_degradation": 1.4898,
+          "sign_flip_count": 2,
+          "reasons": [
+            "2 evaluable neighbour(s) flip sign (<= 0)",
+            "median neighbour degrades 149% > 50%"
+          ]
+        },
+        "horizon_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 1.0926,
+          "median_neighbor_metric": 2.0353,
+          "median_degradation": -0.8628,
+          "sign_flip_count": 0,
+          "reasons": []
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 56,
+        "mean": 0.001025,
+        "std": 0.100079,
+        "sharpe": 0.010243,
+        "skew": 0.239057,
+        "kurtosis": 2.956481,
+        "n_trials": 224,
+        "trial_sharpe_variance": 0.050548,
+        "expected_max_sharpe": 0.630049,
+        "dsr": 2e-06,
+        "dsr_threshold": 0.95,
+        "status": "FAIL"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "FAILED",
+      "verdict_reasons": [
+        "OOS gross expectancy <= 0",
+        "OOS expectancy not above liquid-universe baseline",
+        "OOS illustrative-net expectancy <= 0"
+      ]
+    },
+    {
+      "trial_id": "study::s1_relative_strength_foreign::SWING_3_10D",
+      "strategy_id": "s1_relative_strength_foreign",
+      "family": "RELATIVE_STRENGTH",
+      "hypothesis": "Positive foreign net flow ranks as relative-strength proxy for forward holding returns",
+      "entry_rule": "Top-N foreign_flow radar on entry_date (PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "SWING_3_10D",
+      "holding_days": 7,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 269,
+          "gross_expectancy_pct": 3.1407,
+          "illustrative_net_expectancy_pct": 2.5234,
+          "baseline_expectancy_pct": 1.4245,
+          "excess_vs_baseline_pct": 1.7162,
+          "win_rate_pct": 49.07,
+          "median_mfe_pct": 8.0808,
+          "median_mae_pct": -7.4627,
+          "median_holding_sessions": 7.0,
+          "sharpe_ratio": 8.89,
+          "max_drawdown_pct": 10.39,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "OK",
+          "sample_count": 130,
+          "gross_expectancy_pct": 0.5344,
+          "illustrative_net_expectancy_pct": -0.0673,
+          "baseline_expectancy_pct": 0.3689,
+          "excess_vs_baseline_pct": 0.1655,
+          "win_rate_pct": 43.08,
+          "median_mfe_pct": 7.9081,
+          "median_mae_pct": -12.4863,
+          "median_holding_sessions": 7.0,
+          "sharpe_ratio": 0.67,
+          "max_drawdown_pct": 41.25,
+          "failure_reason": null
+        },
+        "OOS": {
+          "status": "OK",
+          "sample_count": 159,
+          "gross_expectancy_pct": 0.614,
+          "illustrative_net_expectancy_pct": 0.0119,
+          "baseline_expectancy_pct": -0.1462,
+          "excess_vs_baseline_pct": 0.7602,
+          "win_rate_pct": 51.57,
+          "median_mfe_pct": 8.4507,
+          "median_mae_pct": -6.6667,
+          "median_holding_sessions": 7.0,
+          "sharpe_ratio": 1.17,
+          "max_drawdown_pct": 28.11,
+          "failure_reason": null
+        }
+      },
+      "walk_forward_status": "OK",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "OK",
+          "sample_count": 50,
+          "gross_expectancy_pct": 5.909
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "OK",
+          "sample_count": 50,
+          "gross_expectancy_pct": 4.975
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "OK",
+          "sample_count": 50,
+          "gross_expectancy_pct": 1.603
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "OK",
+          "sample_count": 40,
+          "gross_expectancy_pct": -1.7913
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "OK",
+          "sample_count": 50,
+          "gross_expectancy_pct": 3.2223
+        }
+      ],
+      "eligibility_status": "VALIDATED_FOR_RESEARCH",
+      "robustness_status": "ROBUST",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 3.1407,
+          "median_neighbor_metric": 2.7081,
+          "median_degradation": 0.1377,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "universe_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 3.1407,
+          "median_neighbor_metric": 2.7753,
+          "median_degradation": 0.1163,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "horizon_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 3.1407,
+          "median_neighbor_metric": 3.6318,
+          "median_degradation": -0.1564,
+          "sign_flip_count": 0,
+          "reasons": []
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 56,
+        "mean": 0.018125,
+        "std": 0.080468,
+        "sharpe": 0.225242,
+        "skew": -0.505909,
+        "kurtosis": 3.46938,
+        "n_trials": 224,
+        "trial_sharpe_variance": 0.050548,
+        "expected_max_sharpe": 0.630049,
+        "dsr": 0.002514,
+        "dsr_threshold": 0.95,
+        "status": "FAIL"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "FRAGILE",
+      "verdict_reasons": [
+        "walk-forward fold with expectancy <= 0"
+      ]
+    },
+    {
+      "trial_id": "study::s1_trend_composite::SWING_2_4W",
+      "strategy_id": "s1_trend_composite",
+      "family": "TREND",
+      "hypothesis": "Composite alpha ranking with PIT trend/technical features identifies relative outperformers over the horizon holding window",
+      "entry_rule": "Top-N composite_alpha on entry_date (PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "SWING_2_4W",
+      "holding_days": 15,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 129,
+          "gross_expectancy_pct": 1.0232,
+          "illustrative_net_expectancy_pct": 0.4185,
+          "baseline_expectancy_pct": 2.9945,
+          "excess_vs_baseline_pct": -1.9713,
+          "win_rate_pct": 42.64,
+          "median_mfe_pct": 6.3291,
+          "median_mae_pct": -6.0606,
+          "median_holding_sessions": 15.0,
+          "sharpe_ratio": 2.95,
+          "max_drawdown_pct": 8.07,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "OK",
+          "sample_count": 60,
+          "gross_expectancy_pct": 1.4317,
+          "illustrative_net_expectancy_pct": 0.8246,
+          "baseline_expectancy_pct": 1.3644,
+          "excess_vs_baseline_pct": 0.0673,
+          "win_rate_pct": 40.0,
+          "median_mfe_pct": 7.5764,
+          "median_mae_pct": -7.4237,
+          "median_holding_sessions": 15.0,
+          "sharpe_ratio": 2.07,
+          "max_drawdown_pct": 13.68,
+          "failure_reason": null
+        },
+        "OOS": {
+          "status": "OK",
+          "sample_count": 70,
+          "gross_expectancy_pct": -0.3463,
+          "illustrative_net_expectancy_pct": -0.9427,
+          "baseline_expectancy_pct": 0.0895,
+          "excess_vs_baseline_pct": -0.4358,
+          "win_rate_pct": 48.57,
+          "median_mfe_pct": 6.2097,
+          "median_mae_pct": -6.0715,
+          "median_holding_sessions": 15.0,
+          "sharpe_ratio": -0.68,
+          "max_drawdown_pct": 20.03,
+          "failure_reason": null
+        }
+      },
+      "walk_forward_status": "INSUFFICIENT_DATA",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": 0.689
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": -2.3076
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": -4.2279
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": -2.553
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": 3.7828
+        }
+      ],
+      "eligibility_status": "INCONCLUSIVE",
+      "robustness_status": "ROBUST",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 1.0232,
+          "median_neighbor_metric": 0.8807,
+          "median_degradation": 0.1393,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "universe_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 1.0232,
+          "median_neighbor_metric": 1.5902,
+          "median_degradation": -0.5542,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "horizon_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 1.0232,
+          "median_neighbor_metric": 2.6633,
+          "median_degradation": -1.6029,
+          "sign_flip_count": 0,
+          "reasons": []
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 26,
+        "mean": 0.007556,
+        "std": 0.074718,
+        "sharpe": 0.101126,
+        "skew": -0.012261,
+        "kurtosis": 3.073513,
+        "n_trials": 224,
+        "trial_sharpe_variance": 0.050548,
+        "expected_max_sharpe": 0.630049,
+        "dsr": 0.004194,
+        "dsr_threshold": 0.95,
+        "status": "FAIL"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "FAILED",
+      "verdict_reasons": [
+        "OOS gross expectancy <= 0",
+        "OOS expectancy not above liquid-universe baseline",
+        "OOS illustrative-net expectancy <= 0"
+      ]
+    },
+    {
+      "trial_id": "study::s1_momentum_standalone::SWING_2_4W",
+      "strategy_id": "s1_momentum_standalone",
+      "family": "MOMENTUM",
+      "hypothesis": "Top trailing 20-session return among liquid names continues over the holding window",
+      "entry_rule": "liquid; rank by trailing 20-session Close return desc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "SWING_2_4W",
+      "holding_days": 15,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 130,
+          "gross_expectancy_pct": 4.9747,
+          "illustrative_net_expectancy_pct": 4.3464,
+          "baseline_expectancy_pct": 2.9945,
+          "excess_vs_baseline_pct": 1.9802,
+          "win_rate_pct": 44.62,
+          "median_mfe_pct": 19.4175,
+          "median_mae_pct": -39.6249,
+          "median_holding_sessions": 15.0,
+          "sharpe_ratio": 6.53,
+          "max_drawdown_pct": 17.06,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "OK",
+          "sample_count": 60,
+          "gross_expectancy_pct": 10.3266,
+          "illustrative_net_expectancy_pct": 9.6663,
+          "baseline_expectancy_pct": 1.3644,
+          "excess_vs_baseline_pct": 8.9622,
+          "win_rate_pct": 55.0,
+          "median_mfe_pct": 32.5451,
+          "median_mae_pct": -100.0,
+          "median_holding_sessions": 15.0,
+          "sharpe_ratio": 5.47,
+          "max_drawdown_pct": 37.07,
+          "failure_reason": null
+        },
+        "OOS": {
+          "status": "OK",
+          "sample_count": 68,
+          "gross_expectancy_pct": -0.1026,
+          "illustrative_net_expectancy_pct": -0.7005,
+          "baseline_expectancy_pct": 0.0895,
+          "excess_vs_baseline_pct": -0.1921,
+          "win_rate_pct": 45.59,
+          "median_mfe_pct": 16.8853,
+          "median_mae_pct": -30.111,
+          "median_holding_sessions": 15.0,
+          "sharpe_ratio": -0.23,
+          "max_drawdown_pct": 26.93,
+          "failure_reason": null
+        }
+      },
+      "walk_forward_status": "INSUFFICIENT_DATA",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": 39.8854
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": -5.0105
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": -6.1976
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": -13.6006
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": 8.6211
+        }
+      ],
+      "eligibility_status": "INCONCLUSIVE",
+      "robustness_status": "ROBUST",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 4.9747,
+          "median_neighbor_metric": 5.7904,
+          "median_degradation": -0.164,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "universe_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 4.9747,
+          "median_neighbor_metric": 6.8561,
+          "median_degradation": -0.3782,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "horizon_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 4.9747,
+          "median_neighbor_metric": 9.059,
+          "median_degradation": -0.821,
+          "sign_flip_count": 0,
+          "reasons": []
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 26,
+        "mean": 0.04822,
+        "std": 0.175868,
+        "sharpe": 0.274181,
+        "skew": 0.053613,
+        "kurtosis": 3.260279,
+        "n_trials": 224,
+        "trial_sharpe_variance": 0.050548,
+        "expected_max_sharpe": 0.630049,
+        "dsr": 0.039618,
+        "dsr_threshold": 0.95,
+        "status": "FAIL"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "FAILED",
+      "verdict_reasons": [
+        "OOS gross expectancy <= 0",
+        "OOS expectancy not above liquid-universe baseline",
+        "OOS illustrative-net expectancy <= 0"
+      ]
+    },
+    {
+      "trial_id": "study::s1_breakout_structure::SWING_2_4W",
+      "strategy_id": "s1_breakout_structure",
+      "family": "BREAKOUT",
+      "hypothesis": "Close above the prior 20-session high on expanding volume continues",
+      "entry_rule": "liquid; Close > prior 20-session High and VolRatio20 >= 1.5; rank VolRatio20 desc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "SWING_2_4W",
+      "holding_days": 15,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 87,
+          "gross_expectancy_pct": 8.169,
+          "illustrative_net_expectancy_pct": 7.5216,
+          "baseline_expectancy_pct": 2.9945,
+          "excess_vs_baseline_pct": 5.1745,
+          "win_rate_pct": 50.57,
+          "median_mfe_pct": 14.5631,
+          "median_mae_pct": -12.9353,
+          "median_holding_sessions": 15.0,
+          "sharpe_ratio": 7.37,
+          "max_drawdown_pct": 30.41,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "OK",
+          "sample_count": 46,
+          "gross_expectancy_pct": 5.5387,
+          "illustrative_net_expectancy_pct": 4.9071,
+          "baseline_expectancy_pct": 1.3644,
+          "excess_vs_baseline_pct": 4.1743,
+          "win_rate_pct": 36.96,
+          "median_mfe_pct": 17.7845,
+          "median_mae_pct": -16.577,
+          "median_holding_sessions": 15.0,
+          "sharpe_ratio": 4.57,
+          "max_drawdown_pct": 31.39,
+          "failure_reason": null
+        },
+        "OOS": {
+          "status": "OK",
+          "sample_count": 41,
+          "gross_expectancy_pct": -1.7211,
+          "illustrative_net_expectancy_pct": -2.3093,
+          "baseline_expectancy_pct": 0.0895,
+          "excess_vs_baseline_pct": -1.8106,
+          "win_rate_pct": 51.22,
+          "median_mfe_pct": 12.782,
+          "median_mae_pct": -15.2542,
+          "median_holding_sessions": 15.0,
+          "sharpe_ratio": -8.95,
+          "max_drawdown_pct": 51.13,
+          "failure_reason": null
+        }
+      },
+      "walk_forward_status": "INSUFFICIENT_DATA",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 16,
+          "gross_expectancy_pct": 27.85
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": 0.2307
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 18,
+          "gross_expectancy_pct": -0.8851
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 9,
+          "gross_expectancy_pct": -16.5098
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 8,
+          "gross_expectancy_pct": 0.4168
+        }
+      ],
+      "eligibility_status": "INCONCLUSIVE",
+      "robustness_status": "ROBUST",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 8.169,
+          "median_neighbor_metric": 8.2464,
+          "median_degradation": -0.0095,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "universe_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 8.169,
+          "median_neighbor_metric": 9.3788,
+          "median_degradation": -0.1481,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "horizon_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 8.169,
+          "median_neighbor_metric": 5.6309,
+          "median_degradation": 0.3107,
+          "sign_flip_count": 0,
+          "reasons": []
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 25,
+        "mean": 0.02017,
+        "std": 0.194834,
+        "sharpe": 0.103523,
+        "skew": 0.38825,
+        "kurtosis": 3.558157,
+        "n_trials": 224,
+        "trial_sharpe_variance": 0.050548,
+        "expected_max_sharpe": 0.630049,
+        "dsr": 0.004351,
+        "dsr_threshold": 0.95,
+        "status": "FAIL"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "FAILED",
+      "verdict_reasons": [
+        "OOS gross expectancy <= 0",
+        "OOS expectancy not above liquid-universe baseline",
+        "OOS illustrative-net expectancy <= 0"
+      ]
+    },
+    {
+      "trial_id": "study::s1_pullback_trend::SWING_2_4W",
+      "strategy_id": "s1_pullback_trend",
+      "family": "PULLBACK",
+      "hypothesis": "Oversold RSI pullback inside an EMA20>EMA50 uptrend resumes the trend",
+      "entry_rule": "liquid; Close > EMA50 and EMA20 > EMA50 and RSI14 <= 40; rank RSI14 asc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "SWING_2_4W",
+      "holding_days": 15,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null,
+          "illustrative_net_expectancy_pct": null,
+          "baseline_expectancy_pct": 2.9945,
+          "excess_vs_baseline_pct": null,
+          "win_rate_pct": null,
+          "median_mfe_pct": null,
+          "median_mae_pct": null,
+          "median_holding_sessions": null,
+          "sharpe_ratio": null,
+          "max_drawdown_pct": null,
+          "failure_reason": "sample_count=0 < min_sample=30 (engineering gate)"
+        },
+        "VALIDATION": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null,
+          "illustrative_net_expectancy_pct": null,
+          "baseline_expectancy_pct": 1.3644,
+          "excess_vs_baseline_pct": null,
+          "win_rate_pct": null,
+          "median_mfe_pct": null,
+          "median_mae_pct": null,
+          "median_holding_sessions": null,
+          "sharpe_ratio": null,
+          "max_drawdown_pct": null,
+          "failure_reason": "sample_count=0 < min_sample=30 (engineering gate)"
+        },
+        "OOS": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 1,
+          "gross_expectancy_pct": -32.1739,
+          "illustrative_net_expectancy_pct": -32.5799,
+          "baseline_expectancy_pct": 0.0895,
+          "excess_vs_baseline_pct": -32.2634,
+          "win_rate_pct": 0.0,
+          "median_mfe_pct": 0.0,
+          "median_mae_pct": -39.5652,
+          "median_holding_sessions": 15.0,
+          "sharpe_ratio": 0.0,
+          "max_drawdown_pct": 0.0,
+          "failure_reason": "sample_count=1 < min_sample=30 (engineering gate)"
+        }
+      },
+      "walk_forward_status": "INSUFFICIENT_DATA",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 1,
+          "gross_expectancy_pct": 4.023
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        }
+      ],
+      "eligibility_status": "INSUFFICIENT_DATA",
+      "robustness_status": "INSUFFICIENT_DATA",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 0,
+          "base_metric": null,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "base variant not evaluable"
+          ]
+        },
+        "universe_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 0,
+          "base_metric": null,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "base variant not evaluable"
+          ]
+        },
+        "horizon_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 0,
+          "base_metric": null,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "base variant not evaluable"
+          ]
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 1,
+        "mean": null,
+        "std": null,
+        "sharpe": null,
+        "skew": null,
+        "kurtosis": null,
+        "n_trials": 224,
+        "trial_sharpe_variance": null,
+        "expected_max_sharpe": null,
+        "dsr": null,
+        "dsr_threshold": 0.95,
+        "status": "INSUFFICIENT_DATA",
+        "reason": "periods=1 < 20 or zero variance"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "INSUFFICIENT_DATA",
+      "verdict_reasons": [
+        "IS: INSUFFICIENT_DATA (sample_count=0 < min_sample=30 (engineering gate))",
+        "VALIDATION: INSUFFICIENT_DATA (sample_count=0 < min_sample=30 (engineering gate))",
+        "OOS: INSUFFICIENT_DATA (sample_count=1 < min_sample=30 (engineering gate))"
+      ]
+    },
+    {
+      "trial_id": "study::s1_mean_reversion::SWING_2_4W",
+      "strategy_id": "s1_mean_reversion",
+      "family": "MEAN_REVERSION",
+      "hypothesis": "Close below the lower Bollinger band reverts toward the mean",
+      "entry_rule": "liquid; Close below lower Bollinger band (PctB < 0); rank PctB asc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "SWING_2_4W",
+      "holding_days": 15,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 74,
+          "gross_expectancy_pct": 1.6843,
+          "illustrative_net_expectancy_pct": 1.0757,
+          "baseline_expectancy_pct": 2.9945,
+          "excess_vs_baseline_pct": -1.3102,
+          "win_rate_pct": 47.3,
+          "median_mfe_pct": 8.5154,
+          "median_mae_pct": -7.0276,
+          "median_holding_sessions": 15.0,
+          "sharpe_ratio": 0.11,
+          "max_drawdown_pct": 16.33,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "OK",
+          "sample_count": 38,
+          "gross_expectancy_pct": -0.1288,
+          "illustrative_net_expectancy_pct": -0.7265,
+          "baseline_expectancy_pct": 1.3644,
+          "excess_vs_baseline_pct": -1.4932,
+          "win_rate_pct": 55.26,
+          "median_mfe_pct": 10.5745,
+          "median_mae_pct": -4.6821,
+          "median_holding_sessions": 15.0,
+          "sharpe_ratio": -4.8,
+          "max_drawdown_pct": 40.09,
+          "failure_reason": null
+        },
+        "OOS": {
+          "status": "OK",
+          "sample_count": 41,
+          "gross_expectancy_pct": -2.8943,
+          "illustrative_net_expectancy_pct": -3.4755,
+          "baseline_expectancy_pct": 0.0895,
+          "excess_vs_baseline_pct": -2.9838,
+          "win_rate_pct": 41.46,
+          "median_mfe_pct": 9.1503,
+          "median_mae_pct": -11.3433,
+          "median_holding_sessions": 15.0,
+          "sharpe_ratio": -9.26,
+          "max_drawdown_pct": 26.65,
+          "failure_reason": null
+        }
+      },
+      "walk_forward_status": "INSUFFICIENT_DATA",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 12,
+          "gross_expectancy_pct": 4.2707
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 13,
+          "gross_expectancy_pct": -4.2249
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 15,
+          "gross_expectancy_pct": -7.5071
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": -0.3139
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 6,
+          "gross_expectancy_pct": -0.0386
+        }
+      ],
+      "eligibility_status": "INCONCLUSIVE",
+      "robustness_status": "FRAGILE",
+      "robustness_reasons": [
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 1.6843,
+          "median_neighbor_metric": 2.7564,
+          "median_degradation": -0.6365,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "universe_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 1.6843,
+          "median_neighbor_metric": 1.7512,
+          "median_degradation": -0.0397,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "horizon_sensitivity": {
+          "status": "FRAGILE",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 1.6843,
+          "median_neighbor_metric": 0.5931,
+          "median_degradation": 0.6479,
+          "sign_flip_count": 0,
+          "reasons": [
+            "median neighbour degrades 65% > 50%"
+          ]
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 24,
+        "mean": -0.021428,
+        "std": 0.111509,
+        "sharpe": -0.192163,
+        "skew": -0.007496,
+        "kurtosis": 3.567416,
+        "n_trials": 224,
+        "trial_sharpe_variance": 0.050548,
+        "expected_max_sharpe": 0.630049,
+        "dsr": 4.8e-05,
+        "dsr_threshold": 0.95,
+        "status": "FAIL"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "FAILED",
+      "verdict_reasons": [
+        "OOS gross expectancy <= 0",
+        "OOS expectancy not above liquid-universe baseline",
+        "OOS illustrative-net expectancy <= 0"
+      ]
+    },
+    {
+      "trial_id": "study::s1_volume_expansion::SWING_2_4W",
+      "strategy_id": "s1_volume_expansion",
+      "family": "VOLUME_EXPANSION",
+      "hypothesis": "Volume >= 2x its 20-session average in a bullish EMA regime confirms continuation",
+      "entry_rule": "liquid; bullish TrendRegime and VolRatio20 >= 2.0; rank VolRatio20 desc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "SWING_2_4W",
+      "holding_days": 15,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 129,
+          "gross_expectancy_pct": 5.1422,
+          "illustrative_net_expectancy_pct": 4.5129,
+          "baseline_expectancy_pct": 2.9945,
+          "excess_vs_baseline_pct": 2.1477,
+          "win_rate_pct": 43.41,
+          "median_mfe_pct": 14.1509,
+          "median_mae_pct": -12.9353,
+          "median_holding_sessions": 15.0,
+          "sharpe_ratio": 5.29,
+          "max_drawdown_pct": 35.14,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "OK",
+          "sample_count": 56,
+          "gross_expectancy_pct": 3.7927,
+          "illustrative_net_expectancy_pct": 3.1715,
+          "baseline_expectancy_pct": 1.3644,
+          "excess_vs_baseline_pct": 2.4283,
+          "win_rate_pct": 41.07,
+          "median_mfe_pct": 15.4159,
+          "median_mae_pct": -16.664,
+          "median_holding_sessions": 15.0,
+          "sharpe_ratio": 2.46,
+          "max_drawdown_pct": 31.89,
+          "failure_reason": null
+        },
+        "OOS": {
+          "status": "OK",
+          "sample_count": 68,
+          "gross_expectancy_pct": -1.0938,
+          "illustrative_net_expectancy_pct": -1.6858,
+          "baseline_expectancy_pct": 0.0895,
+          "excess_vs_baseline_pct": -1.1833,
+          "win_rate_pct": 48.53,
+          "median_mfe_pct": 11.7098,
+          "median_mae_pct": -13.7668,
+          "median_holding_sessions": 15.0,
+          "sharpe_ratio": -1.3,
+          "max_drawdown_pct": 40.64,
+          "failure_reason": null
+        }
+      },
+      "walk_forward_status": "INSUFFICIENT_DATA",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 19,
+          "gross_expectancy_pct": 23.5237
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": -9.4298
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": -6.3907
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 14,
+          "gross_expectancy_pct": -8.7054
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 17,
+          "gross_expectancy_pct": -2.0791
+        }
+      ],
+      "eligibility_status": "INCONCLUSIVE",
+      "robustness_status": "ROBUST",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 5.1422,
+          "median_neighbor_metric": 3.1869,
+          "median_degradation": 0.3802,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "universe_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 5.1422,
+          "median_neighbor_metric": 3.924,
+          "median_degradation": 0.2369,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "horizon_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 5.1422,
+          "median_neighbor_metric": 4.7485,
+          "median_degradation": 0.0766,
+          "sign_flip_count": 0,
+          "reasons": []
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 26,
+        "mean": 0.03113,
+        "std": 0.177291,
+        "sharpe": 0.175585,
+        "skew": 0.205597,
+        "kurtosis": 3.112844,
+        "n_trials": 224,
+        "trial_sharpe_variance": 0.050548,
+        "expected_max_sharpe": 0.630049,
+        "dsr": 0.010862,
+        "dsr_threshold": 0.95,
+        "status": "FAIL"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "FAILED",
+      "verdict_reasons": [
+        "OOS gross expectancy <= 0",
+        "OOS expectancy not above liquid-universe baseline",
+        "OOS illustrative-net expectancy <= 0"
+      ]
+    },
+    {
+      "trial_id": "study::s1_relative_strength_foreign::SWING_2_4W",
+      "strategy_id": "s1_relative_strength_foreign",
+      "family": "RELATIVE_STRENGTH",
+      "hypothesis": "Positive foreign net flow ranks as relative-strength proxy for forward holding returns",
+      "entry_rule": "Top-N foreign_flow radar on entry_date (PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "SWING_2_4W",
+      "holding_days": 15,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 129,
+          "gross_expectancy_pct": 6.811,
+          "illustrative_net_expectancy_pct": 6.1717,
+          "baseline_expectancy_pct": 2.9945,
+          "excess_vs_baseline_pct": 3.8165,
+          "win_rate_pct": 48.84,
+          "median_mfe_pct": 11.0,
+          "median_mae_pct": -10.0,
+          "median_holding_sessions": 15.0,
+          "sharpe_ratio": 8.63,
+          "max_drawdown_pct": 7.61,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "OK",
+          "sample_count": 59,
+          "gross_expectancy_pct": 6.8288,
+          "illustrative_net_expectancy_pct": 6.1894,
+          "baseline_expectancy_pct": 1.3644,
+          "excess_vs_baseline_pct": 5.4644,
+          "win_rate_pct": 45.76,
+          "median_mfe_pct": 18.8119,
+          "median_mae_pct": -14.094,
+          "median_holding_sessions": 15.0,
+          "sharpe_ratio": 4.57,
+          "max_drawdown_pct": 28.66,
+          "failure_reason": null
+        },
+        "OOS": {
+          "status": "OK",
+          "sample_count": 67,
+          "gross_expectancy_pct": -1.8309,
+          "illustrative_net_expectancy_pct": -2.4185,
+          "baseline_expectancy_pct": 0.0895,
+          "excess_vs_baseline_pct": -1.9204,
+          "win_rate_pct": 40.3,
+          "median_mfe_pct": 12.0,
+          "median_mae_pct": -10.7744,
+          "median_holding_sessions": 15.0,
+          "sharpe_ratio": -2.25,
+          "max_drawdown_pct": 35.98,
+          "failure_reason": null
+        }
+      },
+      "walk_forward_status": "INSUFFICIENT_DATA",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": 27.0746
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": 7.2568
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": -7.3467
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": -6.5727
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 18,
+          "gross_expectancy_pct": 5.4732
+        }
+      ],
+      "eligibility_status": "INCONCLUSIVE",
+      "robustness_status": "ROBUST",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 6.811,
+          "median_neighbor_metric": 3.82,
+          "median_degradation": 0.4391,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "universe_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 6.811,
+          "median_neighbor_metric": 6.4867,
+          "median_degradation": 0.0476,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "horizon_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 6.811,
+          "median_neighbor_metric": 8.2439,
+          "median_degradation": -0.2104,
+          "sign_flip_count": 0,
+          "reasons": []
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 26,
+        "mean": 0.045523,
+        "std": 0.157793,
+        "sharpe": 0.288499,
+        "skew": 0.529409,
+        "kurtosis": 3.761041,
+        "n_trials": 224,
+        "trial_sharpe_variance": 0.050548,
+        "expected_max_sharpe": 0.630049,
+        "dsr": 0.036293,
+        "dsr_threshold": 0.95,
+        "status": "FAIL"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "FAILED",
+      "verdict_reasons": [
+        "OOS gross expectancy <= 0",
+        "OOS expectancy not above liquid-universe baseline",
+        "OOS illustrative-net expectancy <= 0"
+      ]
+    },
+    {
+      "trial_id": "study::s1_trend_composite::POSITION_1_3M",
+      "strategy_id": "s1_trend_composite",
+      "family": "TREND",
+      "hypothesis": "Composite alpha ranking with PIT trend/technical features identifies relative outperformers over the horizon holding window",
+      "entry_rule": "Top-N composite_alpha on entry_date (PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "POSITION_1_3M",
+      "holding_days": 42,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 40,
+          "gross_expectancy_pct": 0.71,
+          "illustrative_net_expectancy_pct": 0.1072,
+          "baseline_expectancy_pct": 8.511,
+          "excess_vs_baseline_pct": -7.801,
+          "win_rate_pct": 30.0,
+          "median_mfe_pct": 6.5703,
+          "median_mae_pct": -12.0228,
+          "median_holding_sessions": 42.0,
+          "sharpe_ratio": 1.35,
+          "max_drawdown_pct": 0.0,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": -3.0583,
+          "illustrative_net_expectancy_pct": -3.6385,
+          "baseline_expectancy_pct": 4.6412,
+          "excess_vs_baseline_pct": -7.6995,
+          "win_rate_pct": 25.0,
+          "median_mfe_pct": 11.1439,
+          "median_mae_pct": -12.4848,
+          "median_holding_sessions": 42.0,
+          "sharpe_ratio": -3.05,
+          "max_drawdown_pct": 14.4,
+          "failure_reason": "sample_count=20 < min_sample=30 (engineering gate)"
+        },
+        "OOS": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": 0.0928,
+          "illustrative_net_expectancy_pct": -0.5062,
+          "baseline_expectancy_pct": -1.084,
+          "excess_vs_baseline_pct": 1.1768,
+          "win_rate_pct": 40.0,
+          "median_mfe_pct": 8.992,
+          "median_mae_pct": -15.1305,
+          "median_holding_sessions": 42.0,
+          "sharpe_ratio": 0.05,
+          "max_drawdown_pct": 0.0,
+          "failure_reason": "sample_count=20 < min_sample=30 (engineering gate)"
+        }
+      },
+      "walk_forward_status": "INSUFFICIENT_DATA",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        }
+      ],
+      "eligibility_status": "INSUFFICIENT_DATA",
+      "robustness_status": "FRAGILE",
+      "robustness_reasons": [
+        "universe_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 1,
+          "base_metric": 0.71,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "1 evaluable neighbours < 2"
+          ]
+        },
+        "universe_sensitivity": {
+          "status": "FRAGILE",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 0.71,
+          "median_neighbor_metric": -0.5302,
+          "median_degradation": 1.7467,
+          "sign_flip_count": 2,
+          "reasons": [
+            "2 evaluable neighbour(s) flip sign (<= 0)",
+            "median neighbour degrades 175% > 50%"
+          ]
+        },
+        "horizon_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 1,
+          "base_metric": 0.71,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "1 evaluable neighbours < 2"
+          ]
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 8,
+        "mean": -0.003864,
+        "std": 0.118825,
+        "sharpe": -0.032517,
+        "skew": -0.205838,
+        "kurtosis": 1.588626,
+        "n_trials": 224,
+        "trial_sharpe_variance": null,
+        "expected_max_sharpe": null,
+        "dsr": null,
+        "dsr_threshold": 0.95,
+        "status": "INSUFFICIENT_DATA",
+        "reason": "periods=8 < 20 or zero variance"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "INSUFFICIENT_DATA",
+      "verdict_reasons": [
+        "VALIDATION: INSUFFICIENT_DATA (sample_count=20 < min_sample=30 (engineering gate))",
+        "OOS: INSUFFICIENT_DATA (sample_count=20 < min_sample=30 (engineering gate))"
+      ]
+    },
+    {
+      "trial_id": "study::s1_momentum_standalone::POSITION_1_3M",
+      "strategy_id": "s1_momentum_standalone",
+      "family": "MOMENTUM",
+      "hypothesis": "Top trailing 20-session return among liquid names continues over the holding window",
+      "entry_rule": "liquid; rank by trailing 20-session Close return desc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "POSITION_1_3M",
+      "holding_days": 42,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 38,
+          "gross_expectancy_pct": -0.3611,
+          "illustrative_net_expectancy_pct": -0.9574,
+          "baseline_expectancy_pct": 8.511,
+          "excess_vs_baseline_pct": -8.8721,
+          "win_rate_pct": 34.21,
+          "median_mfe_pct": 23.7424,
+          "median_mae_pct": -85.9559,
+          "median_holding_sessions": 42.0,
+          "sharpe_ratio": 0.09,
+          "max_drawdown_pct": 18.21,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": 38.0892,
+          "illustrative_net_expectancy_pct": 37.2627,
+          "baseline_expectancy_pct": 4.6412,
+          "excess_vs_baseline_pct": 33.448,
+          "win_rate_pct": 30.0,
+          "median_mfe_pct": 32.9767,
+          "median_mae_pct": -100.0,
+          "median_holding_sessions": 42.0,
+          "sharpe_ratio": 5.92,
+          "max_drawdown_pct": 34.07,
+          "failure_reason": "sample_count=20 < min_sample=30 (engineering gate)"
+        },
+        "OOS": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": -7.47,
+          "illustrative_net_expectancy_pct": -8.0238,
+          "baseline_expectancy_pct": -1.084,
+          "excess_vs_baseline_pct": -6.386,
+          "win_rate_pct": 25.0,
+          "median_mfe_pct": 34.8461,
+          "median_mae_pct": -48.0769,
+          "median_holding_sessions": 42.0,
+          "sharpe_ratio": -6.22,
+          "max_drawdown_pct": 0.0,
+          "failure_reason": "sample_count=20 < min_sample=30 (engineering gate)"
+        }
+      },
+      "walk_forward_status": "INSUFFICIENT_DATA",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        }
+      ],
+      "eligibility_status": "INSUFFICIENT_DATA",
+      "robustness_status": "INCONCLUSIVE",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 1,
+          "base_metric": -0.3611,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "1 evaluable neighbours < 2"
+          ]
+        },
+        "universe_sensitivity": {
+          "status": "INCONCLUSIVE",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": -0.3611,
+          "median_neighbor_metric": -0.2537,
+          "median_degradation": null,
+          "sign_flip_count": 1,
+          "reasons": [
+            "base metric <= 0 — no positive effect whose stability can be assessed"
+          ]
+        },
+        "horizon_sensitivity": {
+          "status": "INCONCLUSIVE",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": -0.3611,
+          "median_neighbor_metric": 13.1726,
+          "median_degradation": null,
+          "sign_flip_count": 0,
+          "reasons": [
+            "base metric <= 0 — no positive effect whose stability can be assessed"
+          ]
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 8,
+        "mean": 0.077039,
+        "std": 0.445165,
+        "sharpe": 0.173057,
+        "skew": 1.669398,
+        "kurtosis": 4.77082,
+        "n_trials": 224,
+        "trial_sharpe_variance": null,
+        "expected_max_sharpe": null,
+        "dsr": null,
+        "dsr_threshold": 0.95,
+        "status": "INSUFFICIENT_DATA",
+        "reason": "periods=8 < 20 or zero variance"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "INSUFFICIENT_DATA",
+      "verdict_reasons": [
+        "VALIDATION: INSUFFICIENT_DATA (sample_count=20 < min_sample=30 (engineering gate))",
+        "OOS: INSUFFICIENT_DATA (sample_count=20 < min_sample=30 (engineering gate))"
+      ]
+    },
+    {
+      "trial_id": "study::s1_breakout_structure::POSITION_1_3M",
+      "strategy_id": "s1_breakout_structure",
+      "family": "BREAKOUT",
+      "hypothesis": "Close above the prior 20-session high on expanding volume continues",
+      "entry_rule": "liquid; Close > prior 20-session High and VolRatio20 >= 1.5; rank VolRatio20 desc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "POSITION_1_3M",
+      "holding_days": 42,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 24,
+          "gross_expectancy_pct": 3.3668,
+          "illustrative_net_expectancy_pct": 2.7481,
+          "baseline_expectancy_pct": 8.511,
+          "excess_vs_baseline_pct": -5.1442,
+          "win_rate_pct": 33.33,
+          "median_mfe_pct": 14.655,
+          "median_mae_pct": -24.2172,
+          "median_holding_sessions": 42.0,
+          "sharpe_ratio": 5.14,
+          "max_drawdown_pct": 4.24,
+          "failure_reason": "sample_count=24 < min_sample=30 (engineering gate)"
+        },
+        "VALIDATION": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 17,
+          "gross_expectancy_pct": 45.7204,
+          "illustrative_net_expectancy_pct": 44.8483,
+          "baseline_expectancy_pct": 4.6412,
+          "excess_vs_baseline_pct": 41.0792,
+          "win_rate_pct": 35.29,
+          "median_mfe_pct": 14.8438,
+          "median_mae_pct": -38.4615,
+          "median_holding_sessions": 42.0,
+          "sharpe_ratio": 8.54,
+          "max_drawdown_pct": 18.65,
+          "failure_reason": "sample_count=17 < min_sample=30 (engineering gate)"
+        },
+        "OOS": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 1,
+          "gross_expectancy_pct": -58.4507,
+          "illustrative_net_expectancy_pct": -58.6994,
+          "baseline_expectancy_pct": -1.084,
+          "excess_vs_baseline_pct": -57.3667,
+          "win_rate_pct": 0.0,
+          "median_mfe_pct": 19.7183,
+          "median_mae_pct": -63.3803,
+          "median_holding_sessions": 42.0,
+          "sharpe_ratio": 0.0,
+          "max_drawdown_pct": 0.0,
+          "failure_reason": "sample_count=1 < min_sample=30 (engineering gate)"
+        }
+      },
+      "walk_forward_status": "INSUFFICIENT_DATA",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        }
+      ],
+      "eligibility_status": "INSUFFICIENT_DATA",
+      "robustness_status": "INSUFFICIENT_DATA",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 0,
+          "base_metric": null,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "base variant not evaluable"
+          ]
+        },
+        "universe_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 1,
+          "base_metric": null,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "base variant not evaluable"
+          ]
+        },
+        "horizon_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 1,
+          "base_metric": null,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "base variant not evaluable"
+          ]
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 7,
+        "mean": 0.111769,
+        "std": 0.612064,
+        "sharpe": 0.182609,
+        "skew": 1.299554,
+        "kurtosis": 3.887187,
+        "n_trials": 224,
+        "trial_sharpe_variance": null,
+        "expected_max_sharpe": null,
+        "dsr": null,
+        "dsr_threshold": 0.95,
+        "status": "INSUFFICIENT_DATA",
+        "reason": "periods=7 < 20 or zero variance"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "INSUFFICIENT_DATA",
+      "verdict_reasons": [
+        "IS: INSUFFICIENT_DATA (sample_count=24 < min_sample=30 (engineering gate))",
+        "VALIDATION: INSUFFICIENT_DATA (sample_count=17 < min_sample=30 (engineering gate))",
+        "OOS: INSUFFICIENT_DATA (sample_count=1 < min_sample=30 (engineering gate))"
+      ]
+    },
+    {
+      "trial_id": "study::s1_pullback_trend::POSITION_1_3M",
+      "strategy_id": "s1_pullback_trend",
+      "family": "PULLBACK",
+      "hypothesis": "Oversold RSI pullback inside an EMA20>EMA50 uptrend resumes the trend",
+      "entry_rule": "liquid; Close > EMA50 and EMA20 > EMA50 and RSI14 <= 40; rank RSI14 asc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "POSITION_1_3M",
+      "holding_days": 42,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null,
+          "illustrative_net_expectancy_pct": null,
+          "baseline_expectancy_pct": 8.511,
+          "excess_vs_baseline_pct": null,
+          "win_rate_pct": null,
+          "median_mfe_pct": null,
+          "median_mae_pct": null,
+          "median_holding_sessions": null,
+          "sharpe_ratio": null,
+          "max_drawdown_pct": null,
+          "failure_reason": "sample_count=0 < min_sample=30 (engineering gate)"
+        },
+        "VALIDATION": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null,
+          "illustrative_net_expectancy_pct": null,
+          "baseline_expectancy_pct": 4.6412,
+          "excess_vs_baseline_pct": null,
+          "win_rate_pct": null,
+          "median_mfe_pct": null,
+          "median_mae_pct": null,
+          "median_holding_sessions": null,
+          "sharpe_ratio": null,
+          "max_drawdown_pct": null,
+          "failure_reason": "sample_count=0 < min_sample=30 (engineering gate)"
+        },
+        "OOS": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null,
+          "illustrative_net_expectancy_pct": null,
+          "baseline_expectancy_pct": -1.084,
+          "excess_vs_baseline_pct": null,
+          "win_rate_pct": null,
+          "median_mfe_pct": null,
+          "median_mae_pct": null,
+          "median_holding_sessions": null,
+          "sharpe_ratio": null,
+          "max_drawdown_pct": null,
+          "failure_reason": "sample_count=0 < min_sample=30 (engineering gate)"
+        }
+      },
+      "walk_forward_status": "INSUFFICIENT_DATA",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        }
+      ],
+      "eligibility_status": "INSUFFICIENT_DATA",
+      "robustness_status": "INSUFFICIENT_DATA",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 0,
+          "base_metric": null,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "base variant not evaluable"
+          ]
+        },
+        "universe_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 0,
+          "base_metric": null,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "base variant not evaluable"
+          ]
+        },
+        "horizon_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 0,
+          "base_metric": null,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "base variant not evaluable"
+          ]
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 0,
+        "mean": null,
+        "std": null,
+        "sharpe": null,
+        "skew": null,
+        "kurtosis": null,
+        "n_trials": 224,
+        "trial_sharpe_variance": null,
+        "expected_max_sharpe": null,
+        "dsr": null,
+        "dsr_threshold": 0.95,
+        "status": "INSUFFICIENT_DATA",
+        "reason": "periods=0 < 20 or zero variance"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "INSUFFICIENT_DATA",
+      "verdict_reasons": [
+        "IS: INSUFFICIENT_DATA (sample_count=0 < min_sample=30 (engineering gate))",
+        "VALIDATION: INSUFFICIENT_DATA (sample_count=0 < min_sample=30 (engineering gate))",
+        "OOS: INSUFFICIENT_DATA (sample_count=0 < min_sample=30 (engineering gate))"
+      ]
+    },
+    {
+      "trial_id": "study::s1_mean_reversion::POSITION_1_3M",
+      "strategy_id": "s1_mean_reversion",
+      "family": "MEAN_REVERSION",
+      "hypothesis": "Close below the lower Bollinger band reverts toward the mean",
+      "entry_rule": "liquid; Close below lower Bollinger band (PctB < 0); rank PctB asc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "POSITION_1_3M",
+      "holding_days": 42,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 8,
+          "gross_expectancy_pct": -1.3486,
+          "illustrative_net_expectancy_pct": -1.939,
+          "baseline_expectancy_pct": 8.511,
+          "excess_vs_baseline_pct": -9.8596,
+          "win_rate_pct": 12.5,
+          "median_mfe_pct": 12.5034,
+          "median_mae_pct": -16.0681,
+          "median_holding_sessions": 42.0,
+          "sharpe_ratio": -4.52,
+          "max_drawdown_pct": 11.49,
+          "failure_reason": "sample_count=8 < min_sample=30 (engineering gate)"
+        },
+        "VALIDATION": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 13,
+          "gross_expectancy_pct": 3.7716,
+          "illustrative_net_expectancy_pct": 3.1505,
+          "baseline_expectancy_pct": 4.6412,
+          "excess_vs_baseline_pct": -0.8696,
+          "win_rate_pct": 30.77,
+          "median_mfe_pct": 20.3271,
+          "median_mae_pct": -22.8972,
+          "median_holding_sessions": 42.0,
+          "sharpe_ratio": 3.69,
+          "max_drawdown_pct": 25.75,
+          "failure_reason": "sample_count=13 < min_sample=30 (engineering gate)"
+        },
+        "OOS": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 16,
+          "gross_expectancy_pct": -8.943,
+          "illustrative_net_expectancy_pct": -9.488,
+          "baseline_expectancy_pct": -1.084,
+          "excess_vs_baseline_pct": -7.859,
+          "win_rate_pct": 50.0,
+          "median_mfe_pct": 15.5435,
+          "median_mae_pct": -15.5169,
+          "median_holding_sessions": 42.0,
+          "sharpe_ratio": -7.27,
+          "max_drawdown_pct": 0.0,
+          "failure_reason": "sample_count=16 < min_sample=30 (engineering gate)"
+        }
+      },
+      "walk_forward_status": "INSUFFICIENT_DATA",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        }
+      ],
+      "eligibility_status": "INSUFFICIENT_DATA",
+      "robustness_status": "INSUFFICIENT_DATA",
+      "robustness_reasons": [
+        "parameter_sensitivity",
+        "universe_sensitivity",
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 0,
+          "base_metric": null,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "base variant not evaluable"
+          ]
+        },
+        "universe_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 0,
+          "base_metric": null,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "base variant not evaluable"
+          ]
+        },
+        "horizon_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 0,
+          "base_metric": null,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "base variant not evaluable"
+          ]
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 8,
+        "mean": -0.024699,
+        "std": 0.275346,
+        "sharpe": -0.089702,
+        "skew": 0.7305,
+        "kurtosis": 2.857972,
+        "n_trials": 224,
+        "trial_sharpe_variance": null,
+        "expected_max_sharpe": null,
+        "dsr": null,
+        "dsr_threshold": 0.95,
+        "status": "INSUFFICIENT_DATA",
+        "reason": "periods=8 < 20 or zero variance"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "INSUFFICIENT_DATA",
+      "verdict_reasons": [
+        "IS: INSUFFICIENT_DATA (sample_count=8 < min_sample=30 (engineering gate))",
+        "VALIDATION: INSUFFICIENT_DATA (sample_count=13 < min_sample=30 (engineering gate))",
+        "OOS: INSUFFICIENT_DATA (sample_count=16 < min_sample=30 (engineering gate))"
+      ]
+    },
+    {
+      "trial_id": "study::s1_volume_expansion::POSITION_1_3M",
+      "strategy_id": "s1_volume_expansion",
+      "family": "VOLUME_EXPANSION",
+      "hypothesis": "Volume >= 2x its 20-session average in a bullish EMA regime confirms continuation",
+      "entry_rule": "liquid; bullish TrendRegime and VolRatio20 >= 2.0; rank VolRatio20 desc (entry-session Close, PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "POSITION_1_3M",
+      "holding_days": 42,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 39,
+          "gross_expectancy_pct": 13.2326,
+          "illustrative_net_expectancy_pct": 12.5549,
+          "baseline_expectancy_pct": 8.511,
+          "excess_vs_baseline_pct": 4.7216,
+          "win_rate_pct": 46.15,
+          "median_mfe_pct": 19.883,
+          "median_mae_pct": -21.7195,
+          "median_holding_sessions": 42.0,
+          "sharpe_ratio": 11.28,
+          "max_drawdown_pct": 8.7,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 19,
+          "gross_expectancy_pct": 46.5631,
+          "illustrative_net_expectancy_pct": 45.6859,
+          "baseline_expectancy_pct": 4.6412,
+          "excess_vs_baseline_pct": 41.9219,
+          "win_rate_pct": 36.84,
+          "median_mfe_pct": 17.6471,
+          "median_mae_pct": -31.7708,
+          "median_holding_sessions": 42.0,
+          "sharpe_ratio": 7.57,
+          "max_drawdown_pct": 24.36,
+          "failure_reason": "sample_count=19 < min_sample=30 (engineering gate)"
+        },
+        "OOS": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 12,
+          "gross_expectancy_pct": -24.4904,
+          "illustrative_net_expectancy_pct": -24.9424,
+          "baseline_expectancy_pct": -1.084,
+          "excess_vs_baseline_pct": -23.4064,
+          "win_rate_pct": 0.0,
+          "median_mfe_pct": 23.4592,
+          "median_mae_pct": -31.0023,
+          "median_holding_sessions": 42.0,
+          "sharpe_ratio": -13.24,
+          "max_drawdown_pct": 2.37,
+          "failure_reason": "sample_count=12 < min_sample=30 (engineering gate)"
+        }
+      },
+      "walk_forward_status": "INSUFFICIENT_DATA",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        }
+      ],
+      "eligibility_status": "INSUFFICIENT_DATA",
+      "robustness_status": "FRAGILE",
+      "robustness_reasons": [
+        "horizon_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 1,
+          "base_metric": 13.2326,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "1 evaluable neighbours < 2"
+          ]
+        },
+        "universe_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 13.2326,
+          "median_neighbor_metric": 9.4918,
+          "median_degradation": 0.2827,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "horizon_sensitivity": {
+          "status": "FRAGILE",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 13.2326,
+          "median_neighbor_metric": 3.5241,
+          "median_degradation": 0.7337,
+          "sign_flip_count": 0,
+          "reasons": [
+            "median neighbour degrades 73% > 50%"
+          ]
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 8,
+        "mean": 0.153615,
+        "std": 0.493061,
+        "sharpe": 0.311553,
+        "skew": 1.492801,
+        "kurtosis": 4.238031,
+        "n_trials": 224,
+        "trial_sharpe_variance": null,
+        "expected_max_sharpe": null,
+        "dsr": null,
+        "dsr_threshold": 0.95,
+        "status": "INSUFFICIENT_DATA",
+        "reason": "periods=8 < 20 or zero variance"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "INSUFFICIENT_DATA",
+      "verdict_reasons": [
+        "VALIDATION: INSUFFICIENT_DATA (sample_count=19 < min_sample=30 (engineering gate))",
+        "OOS: INSUFFICIENT_DATA (sample_count=12 < min_sample=30 (engineering gate))"
+      ]
+    },
+    {
+      "trial_id": "study::s1_relative_strength_foreign::POSITION_1_3M",
+      "strategy_id": "s1_relative_strength_foreign",
+      "family": "RELATIVE_STRENGTH",
+      "hypothesis": "Positive foreign net flow ranks as relative-strength proxy for forward holding returns",
+      "entry_rule": "Top-N foreign_flow radar on entry_date (PIT)",
+      "exit_rule": "Close after holding_days sessions (optional fixed SL/TP)",
+      "horizon": "POSITION_1_3M",
+      "holding_days": 42,
+      "parameters": {
+        "top_n": 10,
+        "min_turnover_rp": 1000000000
+      },
+      "phases": {
+        "IS": {
+          "status": "OK",
+          "sample_count": 40,
+          "gross_expectancy_pct": 19.5382,
+          "illustrative_net_expectancy_pct": 18.8228,
+          "baseline_expectancy_pct": 8.511,
+          "excess_vs_baseline_pct": 11.0272,
+          "win_rate_pct": 55.0,
+          "median_mfe_pct": 22.4505,
+          "median_mae_pct": -14.8767,
+          "median_holding_sessions": 42.0,
+          "sharpe_ratio": 17.44,
+          "max_drawdown_pct": 0.0,
+          "failure_reason": null
+        },
+        "VALIDATION": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": 19.3674,
+          "illustrative_net_expectancy_pct": 18.653,
+          "baseline_expectancy_pct": 4.6412,
+          "excess_vs_baseline_pct": 14.7262,
+          "win_rate_pct": 45.0,
+          "median_mfe_pct": 29.8629,
+          "median_mae_pct": -16.6821,
+          "median_holding_sessions": 42.0,
+          "sharpe_ratio": 4.85,
+          "max_drawdown_pct": 25.41,
+          "failure_reason": "sample_count=20 < min_sample=30 (engineering gate)"
+        },
+        "OOS": {
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 20,
+          "gross_expectancy_pct": 6.649,
+          "illustrative_net_expectancy_pct": 6.0107,
+          "baseline_expectancy_pct": -1.084,
+          "excess_vs_baseline_pct": 7.733,
+          "win_rate_pct": 60.0,
+          "median_mfe_pct": 40.0177,
+          "median_mae_pct": -17.4748,
+          "median_holding_sessions": 42.0,
+          "sharpe_ratio": 3.03,
+          "max_drawdown_pct": 0.0,
+          "failure_reason": "sample_count=20 < min_sample=30 (engineering gate)"
+        }
+      },
+      "walk_forward_status": "INSUFFICIENT_DATA",
+      "walk_forward_folds": [
+        {
+          "fold_id": "wf_000",
+          "test": [
+            "2025-11-01",
+            "2025-12-30"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_001",
+          "test": [
+            "2025-12-31",
+            "2026-02-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_002",
+          "test": [
+            "2026-03-01",
+            "2026-04-29"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_003",
+          "test": [
+            "2026-04-30",
+            "2026-06-28"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        },
+        {
+          "fold_id": "wf_004",
+          "test": [
+            "2026-06-29",
+            "2026-08-27"
+          ],
+          "status": "INSUFFICIENT_DATA",
+          "sample_count": 0,
+          "gross_expectancy_pct": null
+        }
+      ],
+      "eligibility_status": "INSUFFICIENT_DATA",
+      "robustness_status": "INCONCLUSIVE",
+      "robustness_reasons": [
+        "parameter_sensitivity"
+      ],
+      "robustness_dimensions": {
+        "parameter_sensitivity": {
+          "status": "INSUFFICIENT_DATA",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 1,
+          "base_metric": 19.5382,
+          "median_neighbor_metric": null,
+          "median_degradation": null,
+          "sign_flip_count": null,
+          "reasons": [
+            "1 evaluable neighbours < 2"
+          ]
+        },
+        "universe_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 19.5382,
+          "median_neighbor_metric": 15.6929,
+          "median_degradation": 0.1968,
+          "sign_flip_count": 0,
+          "reasons": []
+        },
+        "horizon_sensitivity": {
+          "status": "ROBUST",
+          "neighbor_count": 2,
+          "evaluable_neighbor_count": 2,
+          "base_metric": 19.5382,
+          "median_neighbor_metric": 18.7736,
+          "median_degradation": 0.0391,
+          "sign_flip_count": 0,
+          "reasons": []
+        }
+      },
+      "cost_semantics": {
+        "cost_model": "illustrative:stress-15-25",
+        "slippage_model": "illustrative:stress-10",
+        "net_return_status": "RESEARCH_ILLUSTRATIVE",
+        "return_is_net_tradable": false
+      },
+      "production_status": null,
+      "production_buy_emitted": false,
+      "deflated_sharpe": {
+        "periods": 8,
+        "mean": 0.162732,
+        "std": 0.30252,
+        "sharpe": 0.537922,
+        "skew": 0.097393,
+        "kurtosis": 1.991068,
+        "n_trials": 224,
+        "trial_sharpe_variance": null,
+        "expected_max_sharpe": null,
+        "dsr": null,
+        "dsr_threshold": 0.95,
+        "status": "INSUFFICIENT_DATA",
+        "reason": "periods=8 < 20 or zero variance"
+      },
+      "fdr_decision": "UNTESTABLE",
+      "verdict": "INSUFFICIENT_DATA",
+      "verdict_reasons": [
+        "VALIDATION: INSUFFICIENT_DATA (sample_count=20 < min_sample=30 (engineering gate))",
+        "OOS: INSUFFICIENT_DATA (sample_count=20 < min_sample=30 (engineering gate))"
+      ]
+    }
+  ],
+  "not_evaluated": [
+    {
+      "trial_id": "study::s1_trend_composite::INTRADAY",
+      "strategy_id": "s1_trend_composite",
+      "family": "TREND",
+      "horizon": "INTRADAY",
+      "verdict": "UNAVAILABLE",
+      "reason": "No intraday tape — cannot evaluate INTRADAY horizon"
+    },
+    {
+      "trial_id": "study::s1_momentum_standalone::INTRADAY",
+      "strategy_id": "s1_momentum_standalone",
+      "family": "MOMENTUM",
+      "horizon": "INTRADAY",
+      "verdict": "UNAVAILABLE",
+      "reason": "No intraday tape — cannot evaluate INTRADAY horizon"
+    },
+    {
+      "trial_id": "study::s1_breakout_structure::INTRADAY",
+      "strategy_id": "s1_breakout_structure",
+      "family": "BREAKOUT",
+      "horizon": "INTRADAY",
+      "verdict": "UNAVAILABLE",
+      "reason": "No intraday tape — cannot evaluate INTRADAY horizon"
+    },
+    {
+      "trial_id": "study::s1_pullback_trend::INTRADAY",
+      "strategy_id": "s1_pullback_trend",
+      "family": "PULLBACK",
+      "horizon": "INTRADAY",
+      "verdict": "UNAVAILABLE",
+      "reason": "No intraday tape — cannot evaluate INTRADAY horizon"
+    },
+    {
+      "trial_id": "study::s1_mean_reversion::INTRADAY",
+      "strategy_id": "s1_mean_reversion",
+      "family": "MEAN_REVERSION",
+      "horizon": "INTRADAY",
+      "verdict": "UNAVAILABLE",
+      "reason": "No intraday tape — cannot evaluate INTRADAY horizon"
+    },
+    {
+      "trial_id": "study::s1_volume_expansion::INTRADAY",
+      "strategy_id": "s1_volume_expansion",
+      "family": "VOLUME_EXPANSION",
+      "horizon": "INTRADAY",
+      "verdict": "UNAVAILABLE",
+      "reason": "No intraday tape — cannot evaluate INTRADAY horizon"
+    },
+    {
+      "trial_id": "study::s1_relative_strength_foreign::INTRADAY",
+      "strategy_id": "s1_relative_strength_foreign",
+      "family": "RELATIVE_STRENGTH",
+      "horizon": "INTRADAY",
+      "verdict": "UNAVAILABLE",
+      "reason": "No intraday tape — cannot evaluate INTRADAY horizon"
+    },
+    {
+      "trial_id": "study::s1_trend_composite::LONG_TERM_3_12M",
+      "strategy_id": "s1_trend_composite",
+      "family": "TREND",
+      "horizon": "LONG_TERM_3_12M",
+      "verdict": "UNAVAILABLE",
+      "reason": "Long-term expectancy not validated in production path; screener labels CANDIDATE only — no silent fallback"
+    },
+    {
+      "trial_id": "study::s1_momentum_standalone::LONG_TERM_3_12M",
+      "strategy_id": "s1_momentum_standalone",
+      "family": "MOMENTUM",
+      "horizon": "LONG_TERM_3_12M",
+      "verdict": "UNAVAILABLE",
+      "reason": "Long-term expectancy not validated in production path; screener labels CANDIDATE only — no silent fallback"
+    },
+    {
+      "trial_id": "study::s1_breakout_structure::LONG_TERM_3_12M",
+      "strategy_id": "s1_breakout_structure",
+      "family": "BREAKOUT",
+      "horizon": "LONG_TERM_3_12M",
+      "verdict": "UNAVAILABLE",
+      "reason": "Long-term expectancy not validated in production path; screener labels CANDIDATE only — no silent fallback"
+    },
+    {
+      "trial_id": "study::s1_pullback_trend::LONG_TERM_3_12M",
+      "strategy_id": "s1_pullback_trend",
+      "family": "PULLBACK",
+      "horizon": "LONG_TERM_3_12M",
+      "verdict": "UNAVAILABLE",
+      "reason": "Long-term expectancy not validated in production path; screener labels CANDIDATE only — no silent fallback"
+    },
+    {
+      "trial_id": "study::s1_mean_reversion::LONG_TERM_3_12M",
+      "strategy_id": "s1_mean_reversion",
+      "family": "MEAN_REVERSION",
+      "horizon": "LONG_TERM_3_12M",
+      "verdict": "UNAVAILABLE",
+      "reason": "Long-term expectancy not validated in production path; screener labels CANDIDATE only — no silent fallback"
+    },
+    {
+      "trial_id": "study::s1_volume_expansion::LONG_TERM_3_12M",
+      "strategy_id": "s1_volume_expansion",
+      "family": "VOLUME_EXPANSION",
+      "horizon": "LONG_TERM_3_12M",
+      "verdict": "UNAVAILABLE",
+      "reason": "Long-term expectancy not validated in production path; screener labels CANDIDATE only — no silent fallback"
+    },
+    {
+      "trial_id": "study::s1_relative_strength_foreign::LONG_TERM_3_12M",
+      "strategy_id": "s1_relative_strength_foreign",
+      "family": "RELATIVE_STRENGTH",
+      "horizon": "LONG_TERM_3_12M",
+      "verdict": "UNAVAILABLE",
+      "reason": "Long-term expectancy not validated in production path; screener labels CANDIDATE only — no silent fallback"
+    },
+    {
+      "trial_id": "study::s1_trend_composite::MULTIBAGGER_1_5Y",
+      "strategy_id": "s1_trend_composite",
+      "family": "TREND",
+      "horizon": "MULTIBAGGER_1_5Y",
+      "verdict": "UNAVAILABLE",
+      "reason": "Multibagger horizon unsupported without survivorship-safe multi-year universe and CA-adjusted series"
+    },
+    {
+      "trial_id": "study::s1_momentum_standalone::MULTIBAGGER_1_5Y",
+      "strategy_id": "s1_momentum_standalone",
+      "family": "MOMENTUM",
+      "horizon": "MULTIBAGGER_1_5Y",
+      "verdict": "UNAVAILABLE",
+      "reason": "Multibagger horizon unsupported without survivorship-safe multi-year universe and CA-adjusted series"
+    },
+    {
+      "trial_id": "study::s1_breakout_structure::MULTIBAGGER_1_5Y",
+      "strategy_id": "s1_breakout_structure",
+      "family": "BREAKOUT",
+      "horizon": "MULTIBAGGER_1_5Y",
+      "verdict": "UNAVAILABLE",
+      "reason": "Multibagger horizon unsupported without survivorship-safe multi-year universe and CA-adjusted series"
+    },
+    {
+      "trial_id": "study::s1_pullback_trend::MULTIBAGGER_1_5Y",
+      "strategy_id": "s1_pullback_trend",
+      "family": "PULLBACK",
+      "horizon": "MULTIBAGGER_1_5Y",
+      "verdict": "UNAVAILABLE",
+      "reason": "Multibagger horizon unsupported without survivorship-safe multi-year universe and CA-adjusted series"
+    },
+    {
+      "trial_id": "study::s1_mean_reversion::MULTIBAGGER_1_5Y",
+      "strategy_id": "s1_mean_reversion",
+      "family": "MEAN_REVERSION",
+      "horizon": "MULTIBAGGER_1_5Y",
+      "verdict": "UNAVAILABLE",
+      "reason": "Multibagger horizon unsupported without survivorship-safe multi-year universe and CA-adjusted series"
+    },
+    {
+      "trial_id": "study::s1_volume_expansion::MULTIBAGGER_1_5Y",
+      "strategy_id": "s1_volume_expansion",
+      "family": "VOLUME_EXPANSION",
+      "horizon": "MULTIBAGGER_1_5Y",
+      "verdict": "UNAVAILABLE",
+      "reason": "Multibagger horizon unsupported without survivorship-safe multi-year universe and CA-adjusted series"
+    },
+    {
+      "trial_id": "study::s1_relative_strength_foreign::MULTIBAGGER_1_5Y",
+      "strategy_id": "s1_relative_strength_foreign",
+      "family": "RELATIVE_STRENGTH",
+      "horizon": "MULTIBAGGER_1_5Y",
+      "verdict": "UNAVAILABLE",
+      "reason": "Multibagger horizon unsupported without survivorship-safe multi-year universe and CA-adjusted series"
+    }
+  ],
+  "trial_limit_reached": false,
+  "multiple_testing": {
+    "number_of_trials": 28,
+    "total_trials": 28,
+    "trials_by_family": {
+      "BREAKOUT": 4,
+      "MEAN_REVERSION": 4,
+      "MOMENTUM": 4,
+      "PULLBACK": 4,
+      "RELATIVE_STRENGTH": 4,
+      "TREND": 4,
+      "VOLUME_EXPANSION": 4
+    },
+    "trials_by_horizon": {
+      "NEXT_DAY_1_3D": 7,
+      "POSITION_1_3M": 7,
+      "SWING_2_4W": 7,
+      "SWING_3_10D": 7
+    },
+    "hypothesis_families": [
+      "BREAKOUT",
+      "MEAN_REVERSION",
+      "MOMENTUM",
+      "PULLBACK",
+      "RELATIVE_STRENGTH",
+      "TREND",
+      "VOLUME_EXPANSION"
+    ],
+    "parameter_count_total": 84,
+    "parameter_variants": 196,
+    "robustness_runs": 28,
+    "robustness_variants_total": 196,
+    "evaluations_upper_bound": 224,
+    "selection_method": "inspection_sort_only — not production winner",
+    "adjustment_status": "NOT_APPLIED",
+    "deflated_sharpe": null,
+    "deflated_sharpe_status": "NOT_IMPLEMENTED",
+    "false_discovery_control": "NOT_IMPLEMENTED",
+    "statistical_significance_claimed": false,
+    "notes": "Multiple hypotheses tested; do not treat top inspection rank as proven edge or production winner. evaluations_upper_bound counts correlated evaluations, not independent tests.",
+    "fdr": {
+      "alpha": 0.1,
+      "tested": 6,
+      "untestable": [
+        "study::s1_breakout_structure::POSITION_1_3M",
+        "study::s1_breakout_structure::SWING_2_4W",
+        "study::s1_breakout_structure::SWING_3_10D",
+        "study::s1_mean_reversion::POSITION_1_3M",
+        "study::s1_mean_reversion::SWING_2_4W",
+        "study::s1_mean_reversion::SWING_3_10D",
+        "study::s1_momentum_standalone::POSITION_1_3M",
+        "study::s1_momentum_standalone::SWING_2_4W",
+        "study::s1_momentum_standalone::SWING_3_10D",
+        "study::s1_pullback_trend::NEXT_DAY_1_3D",
+        "study::s1_pullback_trend::POSITION_1_3M",
+        "study::s1_pullback_trend::SWING_2_4W",
+        "study::s1_pullback_trend::SWING_3_10D",
+        "study::s1_relative_strength_foreign::POSITION_1_3M",
+        "study::s1_relative_strength_foreign::SWING_2_4W",
+        "study::s1_relative_strength_foreign::SWING_3_10D",
+        "study::s1_trend_composite::POSITION_1_3M",
+        "study::s1_trend_composite::SWING_2_4W",
+        "study::s1_trend_composite::SWING_3_10D",
+        "study::s1_volume_expansion::POSITION_1_3M",
+        "study::s1_volume_expansion::SWING_2_4W",
+        "study::s1_volume_expansion::SWING_3_10D"
+      ],
+      "discoveries": [],
+      "method_notes": "Per-period equal-weight portfolio returns (one per exit session). Overlapping holding windows and regime dependence make p-values approximate; evaluations counted as trials are correlated, so N overstates independent tests (conservative for DSR)."
+    }
+  },
+  "engine_runs": 392,
+  "profitable_claim": false,
+  "production_buy_emitted": false,
+  "notes": [
+    "Research study only; no verdict wires a BUY into screener/production.",
+    "Illustrative stress costs are not an IDX fee schedule; net returns are not tradable.",
+    "Close-to-close on exchange-reference adjusted prices; trades spanning price-distorting CA events are excluded; survivorship NOT_VALIDATED."
+  ]
+}

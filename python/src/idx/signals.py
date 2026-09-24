@@ -154,9 +154,7 @@ def foreign_flow_radar(
     g = g[(g["AvgValue"] > min_turnover_rp) & (g["TradebleShares"] > 0)]
     g["PctFloat"] = g["NFF_Shares"] / g["TradebleShares"] * 100.0
     g = g[g["PctFloat"].abs() >= min_abs_pct_float]
-    g["Signal"] = g["PctFloat"].map(
-        lambda p: "foreign_inflow" if p > 0 else "foreign_outflow"
-    )
+    g["Signal"] = g["PctFloat"].map(lambda p: "foreign_inflow" if p > 0 else "foreign_outflow")
 
     out = g.reset_index().rename(columns={"AvgValue": "AvgValueRpB"})
     out["AvgValueRpB"] = out["AvgValueRpB"] / 1e9
@@ -455,6 +453,7 @@ def detect_stealth_accumulation(
         "anomalies_df": pd.DataFrame(),
     }
 
+
 def compute_technical_indicators(stock, ticker=None, rsi_period=14):
     """Computes vectorized technical indicators (RSI-14, EMA 20/50/200, Bollinger Bands, ATR-14).
 
@@ -580,6 +579,7 @@ def composite_alpha_ranking(
     min_turnover_rp=FOREIGN_MIN_TURNOVER_RP,
     top_n=20,
     as_of=None,
+    tech=None,
 ):
     """Combines Value Fundamentals, Foreign Flow, Technical Trend & Risk factors.
 
@@ -591,6 +591,8 @@ def composite_alpha_ranking(
         top_n: max rows returned.
         as_of: optional point-in-time cutoff for fundamental filings
             (``fsDate <= as_of``). When omitted, latest available filings are used.
+        tech: optional precomputed ``compute_technical_indicators`` rows covering
+            exactly the dates in ``stock`` (avoids recomputation in backtests).
 
     Returns:
         DataFrame sorted by CompositeAlphaScore descending.
@@ -614,7 +616,8 @@ def composite_alpha_ranking(
     radar = foreign_flow_radar(
         stock, window_days=20, min_turnover_rp=min_turnover_rp, min_abs_pct_float=0.0
     )
-    tech = compute_technical_indicators(stock)
+    if tech is None:
+        tech = compute_technical_indicators(stock)
     if len(tech) > 0:
         latest_tech = tech.sort_values("Date").groupby("StockCode").last().reset_index()
     else:
@@ -685,7 +688,9 @@ def composite_alpha_ranking(
     merged["ROE"] = roe.round(1)
     merged["DER"] = der.round(2)
     merged["NetForeignFlow_MSh"] = merged["NFF_MSh"]
-    merged["AuditOpinion"] = merged["opini"].fillna("Clean")
+    merged["AuditOpinion"] = (
+        merged["opini"].fillna("Clean") if "opini" in merged.columns else "Clean"
+    )
 
     res = merged.sort_values("AlphaScore", ascending=False).reset_index(drop=True)
     return res[cols].head(top_n)

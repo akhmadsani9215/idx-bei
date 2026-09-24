@@ -6,7 +6,7 @@ Never fabricates transaction-based Fast-In/Fast-Out or stock-specific broker act
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pandas as pd
@@ -24,7 +24,7 @@ ENGINE_VERSION = "big-money-1.1"
 
 
 def _utc() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _lineage(**kwargs: Any) -> dict[str, Any]:
@@ -126,9 +126,7 @@ def _ownership_for_ticker(code: str | None) -> dict[str, Any]:
         deltas = drift.get("top_deltas") or []
         if code:
             filtered = [
-                d
-                for d in deltas
-                if str(d.get("ShareCode") or d.get("code") or "").upper() == code
+                d for d in deltas if str(d.get("ShareCode") or d.get("code") or "").upper() == code
             ]
         else:
             filtered = deltas[:15]
@@ -191,7 +189,7 @@ def _ownership_for_ticker(code: str | None) -> dict[str, Any]:
 
 
 def _foreign_layer(code: str | None, foreign_row: dict[str, Any] | None) -> dict[str, Any]:
-    foreign = {
+    foreign: dict[str, Any] = {
         "layer": "foreign_aggregate",
         "status": "UNAVAILABLE",
         "ticker": code,
@@ -219,9 +217,9 @@ def _foreign_layer(code: str | None, foreign_row: dict[str, Any] | None) -> dict
             foreign["foreign_net"] = fb_f - fs_f
             foreign["status"] = "AVAILABLE"
             foreign["lineage"]["confidence"] = 0.6
-            foreign["lineage"]["as_of"] = str(
-                foreign_row.get("as_of") or foreign_row.get("Date") or ""
-            )[:10] or None
+            foreign["lineage"]["as_of"] = (
+                str(foreign_row.get("as_of") or foreign_row.get("Date") or "")[:10] or None
+            )
         else:
             net = foreign_row.get("NetForeignFlow") or foreign_row.get("foreign_net")
             if net is not None and str(net) != "nan":
@@ -234,7 +232,7 @@ def _foreign_layer(code: str | None, foreign_row: dict[str, Any] | None) -> dict
 
 
 def _broker_layer(broker_summary: Any) -> dict[str, Any]:
-    broker = {
+    broker: dict[str, Any] = {
         "layer": "broker_market_wide",
         "status": "UNAVAILABLE",
         "scope": "MARKET-WIDE",
@@ -332,7 +330,7 @@ def build_big_money(
         "lineage": _lineage(quality="U", confidence=None),
     }
 
-    network = {
+    network: dict[str, Any] = {
         "layer": "network_disclosure_cache",
         "status": "UNAVAILABLE",
         "basis": "disclosure_cache",

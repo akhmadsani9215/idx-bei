@@ -2,27 +2,24 @@
 
 from __future__ import annotations
 
-import tempfile
-from datetime import time
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
-from idx.auth_session import clear_sessions_for_tests, create_session, require_session
-from idx.close_pressure_config import classify_time_window
+from idx import watchlist_store as wl
+from idx.auth_session import clear_sessions_for_tests
+from idx.big_money import build_big_money
 from idx.providers import AIProvider, MarketDataProvider, NotificationProvider, PaymentProvider
 from idx.schema_version import (
     DATA_SCHEMA_VERSION,
     classify_schema_version,
     normalize_company_record,
 )
-from idx.screener.contract import MIN_RR, SETUP_NOT_QUALIFIED
+from idx.screener.contract import MIN_RR
 from idx.screener.engine import run_screener
 from idx.screener.historical import compute_historical_stats
-from idx.screener.structure import enrich_structure, select_dynamic_levels
+from idx.screener.structure import enrich_structure
 from idx.strategy_lab import list_strategies, run_strategy_lab
 from idx.trading_plan import (
     compute_confirm_score,
@@ -31,8 +28,6 @@ from idx.trading_plan import (
     compute_rr,
     enrich_plan,
 )
-from idx import watchlist_store as wl
-from idx.big_money import build_big_money
 
 
 def _bars(code: str, n: int = 80, start: float = 1000.0) -> pd.DataFrame:
@@ -103,9 +98,7 @@ def test_cluster_a_poisoned_future_bar_not_in_levels():
 
 def test_cluster_a_insufficient_sample_status():
     enriched = enrich_structure(_bars("PTBA", n=25))
-    stats = compute_historical_stats(
-        enriched, signal_fn=lambda r: True, min_sample=30, min_rr=1.0
-    )
+    stats = compute_historical_stats(enriched, signal_fn=lambda r: True, min_sample=30, min_rr=1.0)
     assert stats["stats_status"] == "INSUFFICIENT_SAMPLE"
 
 
@@ -131,15 +124,9 @@ def test_watchlist_auth_isolation(client):
     )
     assert dup.status_code == 400
     # Delete missing
-    assert (
-        client.delete("/api/watchlist/ZZZZ", headers={"X-Ritel-Session": s1}).status_code
-        == 404
-    )
+    assert client.delete("/api/watchlist/ZZZZ", headers={"X-Ritel-Session": s1}).status_code == 404
     # Delete ok
-    assert (
-        client.delete("/api/watchlist/ADRO", headers={"X-Ritel-Session": s1}).status_code
-        == 200
-    )
+    assert client.delete("/api/watchlist/ADRO", headers={"X-Ritel-Session": s1}).status_code == 200
     empty = client.get("/api/watchlist", headers={"X-Ritel-Session": s1}).json()
     assert empty["count"] == 0
 

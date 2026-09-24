@@ -7,7 +7,7 @@ Honest PARTIAL / UNAVAILABLE / NOT_QUALIFIED — no fabricated TP/CL/%.
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pandas as pd
@@ -18,6 +18,8 @@ from idx.screener.contract import (
     ENGINE_VERSION,
     MIN_OPPORTUNITY_PCT,
     MIN_RR,
+    PRODUCTION_ELIGIBILITY_REASON,
+    PRODUCTION_ELIGIBILITY_STATUS,
     SETUP_NOT_QUALIFIED,
     STATUS_INSUFFICIENT_DATA,
     STATUS_PARTIAL,
@@ -124,7 +126,9 @@ def _load_stock_frame(
 
     if "Date" in df.columns:
         df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-        df = df.dropna(subset=["Date"]).sort_values(["StockCode", "Date"] if "StockCode" in df.columns else ["Date"])
+        df = df.dropna(subset=["Date"]).sort_values(
+            ["StockCode", "Date"] if "StockCode" in df.columns else ["Date"]
+        )
     return df.reset_index(drop=True)
 
 
@@ -528,9 +532,11 @@ def run_screener(
     universe_total = 0
     scanned = 0
     limitations = [
+        "production_eligibility=NOT_VALIDATED — no setup survived OOS/walk-forward/robustness/cost gates.",
         "Close Pressure uses EOD proxies — BidVolume/OfferVolume are NOT trade-side dominance.",
         "Dynamic TP/CL from structure only; RR≥1:2 required or NOT_QUALIFIED.",
         "Historical stats are descriptive; not a production profitability claim.",
+        "Cost/slippage NOT_CONFIGURED; survivorship NOT_VALIDATED.",
         "No intraday tick/orderbook feed configured.",
         "network_alpha_data.json is optional company meta — not required for OHLC screening.",
     ]
@@ -551,9 +557,11 @@ def run_screener(
                 "universe_capped": False,
                 "max_universe": max_universe,
                 "network_alpha_required": False,
-                "engine_version": ENGINE_VERSION,
-                "limitations": limitations,
-                "note": "No stock_summary rows available for screener.",
+            "engine_version": ENGINE_VERSION,
+            "production_eligibility": PRODUCTION_ELIGIBILITY_STATUS,
+            "production_eligibility_reason": PRODUCTION_ELIGIBILITY_REASON,
+            "limitations": limitations,
+            "note": "No stock_summary rows available for screener.",
             },
         }
 
@@ -589,9 +597,7 @@ def run_screener(
             company = meta_map[code].get("name") or meta_map[code].get("StockName")
 
         if tf == "close_pressure":
-            row = evaluate_close_pressure_row(
-                enriched, company=company, now_jakarta=now_jakarta
-            )
+            row = evaluate_close_pressure_row(enriched, company=company, now_jakarta=now_jakarta)
         elif tf == "swing":
             row = evaluate_swing_row(enriched, company=company)
         else:
@@ -647,7 +653,9 @@ def run_screener(
             "engine_version": ENGINE_VERSION,
             "min_rr": MIN_RR,
             "min_opportunity_pct_close_pressure": MIN_OPPORTUNITY_PCT,
+            "production_eligibility": PRODUCTION_ELIGIBILITY_STATUS,
+            "production_eligibility_reason": PRODUCTION_ELIGIBILITY_REASON,
             "limitations": limitations,
-            "calculated_at": datetime.now(timezone.utc).isoformat(),
+            "calculated_at": datetime.now(UTC).isoformat(),
         },
     }

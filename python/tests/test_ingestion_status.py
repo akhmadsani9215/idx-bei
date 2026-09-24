@@ -117,7 +117,9 @@ class TestIngestionStatus(unittest.TestCase):
         self.assertIn("screener_snapshot", freshness)
         self.assertIn("status", freshness)
         self.assertIn("screener_lagging", freshness)
-        self.assertIn(freshness["status"], ["current", "screener_stale", "screener_missing", "unknown"])
+        self.assertIn(
+            freshness["status"], ["current", "screener_stale", "screener_missing", "unknown"]
+        )
 
     def test_api_ingestion_status_endpoint(self):
         resp = self.client.get("/api/system/ingestion-status")
@@ -159,7 +161,9 @@ class TestIngestionStatus(unittest.TestCase):
             self.assertTrue(freshness["screener_lagging"])
             self.assertIsNotNone(freshness["warning"])
             self.assertTrue(freshness["last_successful_ingestion"]["available"])
-            self.assertEqual(freshness["last_successful_ingestion"]["completed_at"], "2026-09-22T18:30:00")
+            self.assertEqual(
+                freshness["last_successful_ingestion"]["completed_at"], "2026-09-22T18:30:00"
+            )
 
     def test_freshness_current_when_screener_not_behind(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -275,7 +279,10 @@ class TestIngestionStatus(unittest.TestCase):
         "idx.ingestion.refresh_screener_snapshot",
         side_effect=RuntimeError("screener boom"),
     )
-    @patch("idx.pipelines.daily.ingest_daily", return_value={"status": "ok", "stock_summary": {"status": "ok"}})
+    @patch(
+        "idx.pipelines.daily.ingest_daily",
+        return_value={"status": "ok", "stock_summary": {"status": "ok"}},
+    )
     def test_run_async_ingestion_job_daily_screener_failure_soft(self, mock_ingest, mock_screener):
         import asyncio
 

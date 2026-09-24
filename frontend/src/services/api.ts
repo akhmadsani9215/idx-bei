@@ -155,6 +155,22 @@ export async function runBacktest(params: BacktestParams): Promise<BacktestRespo
   return await resp.json();
 }
 
+export async function fetchStrategyCatalog(): Promise<import('../types').StrategyCatalogResponse> {
+  const resp = await fetch('/api/strategy');
+  if (!resp.ok) {
+    throw new Error('Failed to fetch strategy catalog');
+  }
+  return await resp.json();
+}
+
+export async function fetchStrategyResearch(): Promise<import('../types').StrategyResearchResponse> {
+  const resp = await fetch('/api/strategy/research');
+  if (!resp.ok) {
+    throw new Error('Failed to fetch discovery research report');
+  }
+  return await resp.json();
+}
+
 export async function fetchDailyBriefing(date?: string): Promise<any> {
   const url = date ? `/api/signals?date=${date}` : '/api/signals';
   const resp = await fetch(url);
@@ -297,12 +313,6 @@ export async function fetchBigMoney(ticker?: string): Promise<any> {
   const q = ticker ? `?ticker=${encodeURIComponent(ticker)}` : '';
   const resp = await fetch(`/api/big-money${q}`);
   if (!resp.ok) throw new Error('Big Money request failed');
-  return await resp.json();
-}
-
-export async function fetchStrategyCatalog(): Promise<any> {
-  const resp = await fetch('/api/strategy');
-  if (!resp.ok) throw new Error('Strategy catalog failed');
   return await resp.json();
 }
 

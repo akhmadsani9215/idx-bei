@@ -54,7 +54,8 @@ def _synthetic_flow_universe(
                     "Close": c,
                     "Volume": 1_000_000,
                     "Value": 5e9,
-                    "Previous": c - 1.0,
+                    # IDX reference price = prior Close (no corporate action)
+                    "Previous": float(closes[i - 1]) if i else c,
                     "ForeignBuy": fb,
                     "ForeignSell": fs,
                     "TradebleShares": 100_000_000,
@@ -123,7 +124,7 @@ class TestBacktestPITContract(unittest.TestCase):
         # Holding period = 2 unique sessions in the date index (not calendar days)
         entry_ts = pd.Timestamp(first["EntryDate"])
         exit_ts = pd.Timestamp(first["ExitDate"])
-        session_gap = int((dates.get_indexer([exit_ts])[0] - dates.get_indexer([entry_ts])[0]))
+        session_gap = int(dates.get_indexer([exit_ts])[0] - dates.get_indexer([entry_ts])[0])
         self.assertEqual(session_gap, 2)
         # No fees/slippage fields — net return == gross return
         self.assertNotIn("Fee", trades.columns)
@@ -293,7 +294,9 @@ class TestBacktestPITContract(unittest.TestCase):
             min_abs_pct_float=0.0,
             min_turnover_rp=1e8,
         )
-        self.assertEqual(float(full_radar[full_radar["StockCode"] == "AAA"].iloc[0]["Close"]), 120.0)
+        self.assertEqual(
+            float(full_radar[full_radar["StockCode"] == "AAA"].iloc[0]["Close"]), 120.0
+        )
 
     def test_missing_historical_data_does_not_fallback_to_latest_snapshot(self):
         # Only a future undated/later filing exists — PIT as_of must return empty, not latest

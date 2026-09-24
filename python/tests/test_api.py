@@ -145,7 +145,9 @@ class TestAPI(unittest.TestCase):
         self.assertIsInstance(t0["EntryPrice"], (int, float))
         self.assertIsInstance(t0["ExitPrice"], (int, float))
         self.assertIsInstance(t0["Return"], (int, float))
-        self.assertAlmostEqual(float(t0["Return"]), (t0["ExitPrice"] - t0["EntryPrice"]) / t0["EntryPrice"], places=6)
+        self.assertAlmostEqual(
+            float(t0["Return"]), (t0["ExitPrice"] - t0["EntryPrice"]) / t0["EntryPrice"], places=6
+        )
 
         # Equity curve: base 100 then one exit session at 115 (mean return 15%)
         self.assertGreaterEqual(len(data["equity_curve"]), 2)
@@ -377,7 +379,6 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(resp_bad.status_code, 400)
         resp_404 = self.client.get("/api/stock/ZZZZ/blocks")
         self.assertIn(resp_404.status_code, (404, 200))  # 200 only if synthetic data present
-
 
 
 if __name__ == "__main__":

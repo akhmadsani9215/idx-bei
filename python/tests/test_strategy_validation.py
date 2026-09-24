@@ -45,7 +45,8 @@ def _flow_frame(
                 "Close": c,
                 "Volume": 1_000_000,
                 "Value": value,
-                "Previous": c - 1.0,
+                # IDX reference price = prior Close (no corporate action)
+                "Previous": float(closes[i - 1]) if i else c,
                 "ForeignBuy": foreign_buy,
                 "ForeignSell": foreign_sell,
                 "TradebleShares": 100_000_000,

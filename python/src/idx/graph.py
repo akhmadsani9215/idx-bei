@@ -17,11 +17,17 @@ log = get_logger("idx.graph")
 
 NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
-NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
 
 
 def get_neo4j_driver():
-    """Returns a Neo4j driver instance or None if connection fails."""
+    """Returns a Neo4j driver instance or None if not configured / not reachable.
+
+    No built-in password: without ``NEO4J_PASSWORD`` the graph falls back offline.
+    """
+    if not NEO4J_PASSWORD:
+        log.debug("NEO4J_PASSWORD not set — using local offline graph.")
+        return None
     try:
         from neo4j import GraphDatabase
 

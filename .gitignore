@@ -32,6 +32,8 @@ data/.feature_rebuild_cache.json
 data/.target_risk_rebuild_cache.json
 data/.ritelinsight_watchlists.json
 data/.ritelinsight_trading_journal.json
+data/.ingestion_job_history.json
+data/.ingestion_job_history.json.tmp
 *.duckdb.wal
 neo4j_data/
 postgres_data/

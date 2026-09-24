@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from idx.auth_session import SessionPrincipal
@@ -18,7 +18,7 @@ ENGINE_VERSION = "watchlist-1.0"
 
 
 def _utc() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _load() -> dict[str, Any]:
@@ -86,9 +86,7 @@ def add_item(principal: SessionPrincipal, payload: dict[str, Any]) -> dict[str, 
         raise ValueError("ticker is required")
     with _LOCK:
         data = _load()
-        subj = data.setdefault("subjects", {}).setdefault(
-            principal.subject, {"items": []}
-        )
+        subj = data.setdefault("subjects", {}).setdefault(principal.subject, {"items": []})
         items: list[dict[str, Any]] = subj["items"]
         for it in items:
             if it.get("ticker") == ticker:
@@ -115,9 +113,7 @@ def add_item(principal: SessionPrincipal, payload: dict[str, Any]) -> dict[str, 
     return {"item": item, "status": "ok"}
 
 
-def update_item(
-    principal: SessionPrincipal, ticker: str, patch: dict[str, Any]
-) -> dict[str, Any]:
+def update_item(principal: SessionPrincipal, ticker: str, patch: dict[str, Any]) -> dict[str, Any]:
     code = ticker.upper().strip()
     allowed = {
         "company",

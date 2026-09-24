@@ -1,26 +1,39 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { 
-  PlayCircle, 
-  ShieldAlert, 
-  Loader2,
-  Download
-} from 'lucide-react';
-import { 
-  createChart, 
-  LineSeries, 
-  type IChartApi, 
-  type ISeriesApi, 
-  type LineData, 
-  type Time 
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { PlayCircle, ShieldAlert, Loader2, BookOpen } from 'lucide-react';
+import {
+  createChart,
+  LineSeries,
+  type IChartApi,
+  type ISeriesApi,
+  type LineData,
+  type Time,
 } from 'lightweight-charts';
-import type { BacktestParams, BacktestResponse } from '../types';
-import { runBacktest } from '../services/api';
+import type {
+  BacktestParams,
+  BacktestResponse,
+  StrategyCatalogEntry,
+  StrategyResearchResponse,
+} from '../types';
+import { fetchStrategyCatalog, fetchStrategyResearch, runBacktest } from '../services/api';
+import { MethodologyTab } from './MethodologyTab';
 
 interface BacktesterTabProps {
   onSelectStock: (ticker: string) => void;
 }
 
-/** Format a numeric metric; null/undefined → unavailable dash (never invent 0). */
+const FALLBACK_STRATEGIES: { id: BacktestParams['strategy']; label: string }[] = [
+  { id: 'foreign_flow', label: 'Foreign Flow' },
+  { id: 'momentum', label: 'Momentum (Stage-1)' },
+  { id: 'breakout', label: 'Breakout (Stage-1)' },
+  { id: 'pullback', label: 'Pullback (Stage-1)' },
+  { id: 'mean_reversion', label: 'Mean Reversion (Stage-1)' },
+  { id: 'volume_expansion', label: 'Volume Expansion (Stage-1)' },
+  { id: 'composite_alpha', label: 'Composite Alpha' },
+  { id: 'sharia_value', label: 'Sharia Value' },
+  { id: 'bandarmology', label: 'Bandarmology (volume-regime; not broker attribution)' },
+  { id: 'dividend_arbitrage', label: 'Dividend Arbitrage (3-Way)' },
+];
+
 function fmtMetric(
   value: number | null | undefined,
   opts?: { suffix?: string; signed?: boolean },
@@ -30,21 +43,70 @@ function fmtMetric(
   return `${signed}${value}${opts?.suffix ?? ''}`;
 }
 
-export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) => {
-  const [strategy, setStrategy] = useState<BacktestParams['strategy']>('foreign_flow');
-  const [holdingDays, setHoldingDays] = useState<number>(20);
-  const [topN, setTopN] = useState<number>(10);
-  const [stopLoss, setStopLoss] = useState<number>(7);
-  const [takeProfit, setTakeProfit] = useState<number>(15);
-  const [positionSizing, setPositionSizing] = useState<'equal_weight' | 'volatility_parity'>('equal_weight');
+function strategyLabel(id: string, catalog: StrategyCatalogEntry[]): string {
+  const entry = catalog.find((s) => s.id === id);
+  if (entry?.notes) return `${id} · ${entry.status}`;
+  const fb = FALLBACK_STRATEGIES.find((s) => s.id === id);
+  return fb?.label ?? id;
+}
 
-  const [loading, setLoading] = useState<boolean>(false);
+export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) => {
+  const [view, setView] = useState<'lab' | 'methodology'>('lab');
+  const [strategy, setStrategy] = useState<BacktestParams['strategy']>('momentum');
+  const [holdingDays, setHoldingDays] = useState(7);
+  const [topN, setTopN] = useState(10);
+  const [stopLoss, setStopLoss] = useState(0);
+  const [takeProfit, setTakeProfit] = useState(0);
+
+  const [catalog, setCatalog] = useState<StrategyCatalogEntry[]>([]);
+  const [research, setResearch] = useState<StrategyResearchResponse | null>(null);
+  const [metaError, setMetaError] = useState<string | null>(null);
+
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<BacktestResponse | null>(null);
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<IChartApi | null>(null);
   const lineSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [cat, res] = await Promise.all([
+          fetchStrategyCatalog().catch(() => null),
+          fetchStrategyResearch().catch(() => null),
+        ]);
+        if (cancelled) return;
+        if (cat?.strategies?.length) setCatalog(cat.strategies);
+        if (res) setResearch(res);
+        if (!cat && !res) setMetaError('Strategy catalog / research endpoints unavailable.');
+      } catch (e) {
+        if (!cancelled) setMetaError(e instanceof Error ? e.message : 'Research load failed');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedCatalog = useMemo(
+    () => catalog.find((s) => s.id === strategy),
+    [catalog, strategy],
+  );
+
+  const researchForStrategy = useMemo(() => {
+    const engine = selectedCatalog?.engine ?? strategy;
+    return (research?.trials ?? []).filter((t) => {
+      return (
+        t.strategy_id === strategy ||
+        (engine != null && String(t.strategy_id || '').includes(String(engine)))
+      );
+    });
+  }, [research, selectedCatalog, strategy]);
+
+  const horizonVerdicts = selectedCatalog?.research_validation?.by_horizon ?? {};
 
   const handleRun = async () => {
     setLoading(true);
@@ -57,44 +119,15 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
         min_turnover_rp: 1_000_000_000,
         stop_loss_pct: stopLoss > 0 ? stopLoss : undefined,
         take_profit_pct: takeProfit > 0 ? takeProfit : undefined,
-        position_sizing: positionSizing,
       });
       setResult(res);
-    } catch (err: any) {
-      setError(err.message || 'Backtest execution failed');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Backtest execution failed');
     } finally {
       setLoading(false);
     }
   };
 
-  const exportTradesCSV = () => {
-    if (!result?.trades || result.trades.length === 0) return;
-    const headers = ['Ticker', 'Entry Date', 'Exit Date', 'Entry Price', 'Exit Price', 'Return (%)', 'Weight', 'Weighted Return'];
-    const rows = result.trades.map((t) => [
-      t.StockCode,
-      t.EntryDate,
-      t.ExitDate,
-      t.EntryPrice,
-      t.ExitPrice,
-      t.ReturnPct,
-      t.Weight ?? '',
-      t.WeightedReturn ?? '',
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `backtest_${strategy}_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  useEffect(() => {
-    // Do not auto-run heavy backtests on mount — user must click Run.
-  }, []);
-
-  // Render or update equity curve chart
   useEffect(() => {
     const container = chartContainerRef.current;
     if (!container || !result || !result.equity_curve || result.equity_curve.length === 0) return;
@@ -151,8 +184,33 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
   const metrics = result?.metrics;
   const totalTrades = metrics?.total_trades ?? 0;
   const tradesShown = result?.trades?.length ?? 0;
-  // CONTRACT: never display metrics.cagr_pct — it is unavailable and must not alias total return.
   void metrics?.cagr_pct;
+
+  const counts = research?.verdict_counts;
+  const survivors = counts?.SURVIVES_RESEARCH_VALIDATION ?? 0;
+
+  const options =
+    catalog.length > 0
+      ? catalog
+          .filter((s) => s.status !== 'UNAVAILABLE' && s.engine)
+          .map((s) => ({ id: s.id as BacktestParams['strategy'], label: strategyLabel(s.id, catalog) }))
+      : FALLBACK_STRATEGIES;
+
+  if (view === 'methodology') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <button
+          type="button"
+          className="nav-btn"
+          onClick={() => setView('lab')}
+          style={{ alignSelf: 'flex-start' }}
+        >
+          ← Back to Strategy Lab
+        </button>
+        <MethodologyTab research={research} />
+      </div>
+    );
+  }
 
   return (
     <div className="backtester-tab" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -166,31 +224,88 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
           fontSize: '0.82rem',
         }}
       >
-        Strategy Lab: historical metrics are descriptive only.
-        {' '}INSUFFICIENT OOS VALIDATION for all current strategies — do not treat positive results as proven profitability.
-        Close Pressure / Intraday / Big Money Follow remain UNAVAILABLE until data+engine exist.
+        <strong>Research status:</strong> controlled discovery study →{' '}
+        <strong>{survivors} survivors</strong>
+        {counts
+          ? ` (FAILED ${counts.FAILED ?? 0} · FRAGILE ${counts.FRAGILE ?? 0} · INSUFFICIENT_DATA ${counts.INSUFFICIENT_DATA ?? 0} · UNAVAILABLE ${counts.UNAVAILABLE ?? 0})`
+          : ' (report loading…)'}
+        . Single-run simulation is descriptive only — not OOS proof.
+        Cost/slippage <strong>NOT_CONFIGURED</strong>; survivorship{' '}
+        <strong>{research?.survivorship?.status ?? 'NOT_VALIDATED'}</strong>. No production BUY.
+        <button
+          type="button"
+          onClick={() => setView('methodology')}
+          style={{
+            marginLeft: 12,
+            background: 'transparent',
+            border: '1px solid rgba(253, 230, 138, 0.4)',
+            color: '#fde68a',
+            borderRadius: 8,
+            padding: '0.25rem 0.6rem',
+            cursor: 'pointer',
+            fontSize: '0.78rem',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+        >
+          <BookOpen size={14} /> Methodology & study
+        </button>
       </div>
-      {/* Top Banner & Control Deck */}
-      <div style={{
-        background: 'rgba(15, 23, 42, 0.65)',
-        backdropFilter: 'blur(16px)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        borderRadius: '16px',
-        padding: '1.5rem',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+
+      {metaError && (
+        <div style={{ color: '#94a3b8', fontSize: '0.8rem' }}>{metaError}</div>
+      )}
+
+      <div
+        style={{
+          background: 'rgba(15, 23, 42, 0.65)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          borderRadius: '16px',
+          padding: '1.5rem',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '1.25rem',
+            flexWrap: 'wrap',
+            gap: '1rem',
+          }}
+        >
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
               <PlayCircle size={28} style={{ color: '#10b981' }} />
-              <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 700 }}>Quantitative Strategy Simulator</h2>
+              <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 700 }}>Strategy Lab</h2>
             </div>
             <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              Simulate historical execution across 145,000+ daily bars with stop loss, profit targets, and benchmark alpha calculation.
+              Historical simulation on local stock_summary (exchange-reference adjusted; CA-spanning
+              trades excluded). Gross returns only — fees/slippage not applied.
             </p>
+            {selectedCatalog?.research_validation && (
+              <p style={{ margin: '0.4rem 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
+                Catalog validation:{' '}
+                <strong style={{ color: '#fde68a' }}>
+                  {selectedCatalog.research_validation.status}
+                </strong>
+                {Object.keys(horizonVerdicts).length > 0 && (
+                  <>
+                    {' '}
+                    ·{' '}
+                    {Object.entries(horizonVerdicts)
+                      .map(([h, v]) => `${h}=${v}`)
+                      .join(', ')}
+                  </>
+                )}
+              </p>
+            )}
           </div>
 
           <button
-            onClick={handleRun}
+            type="button"
+            onClick={() => void handleRun()}
             disabled={loading}
             style={{
               display: 'flex',
@@ -203,51 +318,50 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
               fontWeight: 700,
               fontSize: '0.9rem',
               border: 'none',
-              cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
+              cursor: loading ? 'wait' : 'pointer',
             }}
           >
             {loading ? <Loader2 size={18} className="spinning" /> : <PlayCircle size={18} />}
-            <span>{loading ? 'Simulating...' : 'Run Simulation'}</span>
+            <span>{loading ? 'Simulating…' : 'Run Simulation'}</span>
           </button>
         </div>
 
-        {/* Parameter Inputs */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: '1rem',
-          paddingTop: '1rem',
-          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-        }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '1rem',
+            paddingTop: '1rem',
+            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+          }}
+        >
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
-              Strategy Alpha Engine
+              Strategy
             </label>
             <select
               value={strategy}
-              onChange={(e) => setStrategy(e.target.value as any)}
+              onChange={(e) => setStrategy(e.target.value as BacktestParams['strategy'])}
               className="filter-select"
               style={{ width: '100%', padding: '0.5rem', borderRadius: '8px' }}
             >
-              <option value="foreign_flow">Foreign Flow Accumulation</option>
-              <option value="stealth_accumulation">Wyckoff Stealth Accumulation (Smart Money)</option>
-              <option value="bandarmology">Bandarmology Momentum</option>
-              <option value="composite_alpha">Composite Multi-Factor Alpha</option>
-              <option value="sharia_value">Sharia Value Screen</option>
-              <option value="dividend_arbitrage">Dividend Arbitrage (3-Way)</option>
+              {options.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
             </select>
           </div>
 
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
-              Holding Period (Sessions)
+              Holding (sessions)
             </label>
             <input
               type="number"
               value={holdingDays}
               onChange={(e) => setHoldingDays(Number(e.target.value))}
-              min={5}
+              min={1}
               max={120}
               className="filter-input"
               style={{ width: '100%', padding: '0.5rem', borderRadius: '8px' }}
@@ -256,7 +370,7 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
 
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
-              Top-N Basket Size
+              Top-N
             </label>
             <input
               type="number"
@@ -271,7 +385,7 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
 
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
-              Stop Loss (%)
+              Stop Loss % (0 = off)
             </label>
             <input
               type="number"
@@ -286,7 +400,7 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
 
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
-              Take Profit (%)
+              Take Profit % (0 = off)
             </label>
             <input
               type="number"
@@ -298,23 +412,45 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
               style={{ width: '100%', padding: '0.5rem', borderRadius: '8px' }}
             />
           </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
-              Position Sizing Mode
-            </label>
-            <select
-              value={positionSizing}
-              onChange={(e) => setPositionSizing(e.target.value as any)}
-              className="filter-select"
-              style={{ width: '100%', padding: '0.5rem', borderRadius: '8px' }}
-            >
-              <option value="equal_weight">Equal Weight (1/N)</option>
-              <option value="volatility_parity">Volatility Parity (Inverse Vol)</option>
-            </select>
-          </div>
         </div>
       </div>
+
+      {Object.keys(horizonVerdicts).length > 0 && (
+        <div
+          style={{
+            background: 'rgba(15, 23, 42, 0.45)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: 12,
+            padding: '0.85rem 1rem',
+            fontSize: '0.8rem',
+            color: '#cbd5e1',
+          }}
+        >
+          <strong style={{ color: '#f1f5f9' }}>Locked study verdicts for this engine</strong>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: 8 }}>
+            {Object.entries(horizonVerdicts).map(([h, v]) => (
+              <span
+                key={h}
+                style={{
+                  padding: '0.25rem 0.55rem',
+                  borderRadius: 6,
+                  background: v === 'SURVIVES_RESEARCH_VALIDATION' ? 'rgba(16,185,129,0.15)' : 'rgba(148,163,184,0.12)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  fontFamily: 'monospace',
+                  fontSize: '0.72rem',
+                }}
+              >
+                {h}: {v}
+              </span>
+            ))}
+          </div>
+          {researchForStrategy.length > 0 && researchForStrategy[0]?.verdict_reasons?.length ? (
+            <p style={{ margin: '0.5rem 0 0', color: '#94a3b8', fontSize: '0.75rem' }}>
+              Sample reasons: {researchForStrategy[0].verdict_reasons.slice(0, 3).join('; ')}
+            </p>
+          ) : null}
+        </div>
+      )}
 
       {error && (
         <div className="error-banner" style={{ padding: '1.25rem' }}>
@@ -326,19 +462,27 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
         </div>
       )}
 
-      {/* KPI Cards — total_return_pct only; never label/display cagr_pct as CAGR */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-        gap: '1rem',
-      }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          gap: '1rem',
+        }}
+      >
         <div className="stat-card" style={{ background: 'rgba(15, 23, 42, 0.55)', padding: '1.25rem', borderRadius: '14px' }}>
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Total Strategy Return</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '0.35rem', color: (metrics?.total_return_pct ?? 0) >= 0 ? '#10b981' : '#ef4444' }}>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Total Strategy Return (gross)</div>
+          <div
+            style={{
+              fontSize: '1.8rem',
+              fontWeight: 800,
+              marginTop: '0.35rem',
+              color: (metrics?.total_return_pct ?? 0) >= 0 ? '#10b981' : '#ef4444',
+            }}
+          >
             {fmtMetric(metrics?.total_return_pct, { suffix: '%', signed: true })}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-            Cumulative portfolio return (not CAGR)
+            Not net tradable · not CAGR
           </div>
         </div>
 
@@ -347,20 +491,12 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
           <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '0.35rem', color: '#38bdf8' }}>
             {fmtMetric(metrics?.sharpe_ratio)}
           </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-            Risk-adjusted excess return
-          </div>
         </div>
 
         <div className="stat-card" style={{ background: 'rgba(15, 23, 42, 0.55)', padding: '1.25rem', borderRadius: '14px' }}>
           <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Max Drawdown</div>
           <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '0.35rem', color: '#ef4444' }}>
-            {metrics?.max_drawdown_pct != null
-              ? `-${Math.abs(metrics.max_drawdown_pct)}%`
-              : '—'}
-          </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-            Peak-to-trough decline
+            {metrics?.max_drawdown_pct != null ? `-${Math.abs(metrics.max_drawdown_pct)}%` : '—'}
           </div>
         </div>
 
@@ -370,136 +506,43 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
             {fmtMetric(metrics?.win_rate_pct, { suffix: '%' })}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-            {totalTrades > 0 ? `${totalTrades} trades` : 'Winning trades percentage'}
+            {totalTrades > 0 ? `${totalTrades} trades` : '—'}
           </div>
         </div>
 
         <div className="stat-card" style={{ background: 'rgba(15, 23, 42, 0.55)', padding: '1.25rem', borderRadius: '14px' }}>
           <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Benchmark Alpha</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '0.35rem', color: (metrics?.alpha_pct ?? 0) >= 0 ? '#10b981' : '#ef4444' }}>
+          <div
+            style={{
+              fontSize: '1.8rem',
+              fontWeight: 800,
+              marginTop: '0.35rem',
+              color: (metrics?.alpha_pct ?? 0) >= 0 ? '#10b981' : '#ef4444',
+            }}
+          >
             {fmtMetric(metrics?.alpha_pct, { suffix: '%', signed: true })}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-            {metrics?.alpha_pct == null
-              ? 'Unavailable (no benchmark series)'
-              : 'vs provided benchmark'}
+            {metrics?.alpha_pct == null ? 'Unavailable (no benchmark)' : 'vs provided benchmark'}
           </div>
         </div>
       </div>
 
-      {/* 3-Way Dividend Arbitrage Comparison Matrix */}
-      {strategy === 'dividend_arbitrage' && (metrics?.strategy_a_naive_hold || metrics?.strategy_b_precum_exit || metrics?.strategy_c_postex_rebuy) && (
-        <div style={{
-          background: 'rgba(15, 23, 42, 0.65)',
-          backdropFilter: 'blur(16px)',
-          border: '1px solid rgba(234, 179, 8, 0.25)',
+      <div
+        style={{
+          background: 'rgba(15, 23, 42, 0.55)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
           borderRadius: '16px',
           padding: '1.5rem',
-        }}>
-          <div style={{ marginBottom: '1.25rem' }}>
-            <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#facc15' }}>
-              3-Way Dividend Capture Arbitrage Comparison ({metrics?.total_events || 0} Dividend Events)
-            </h3>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              Empirical historical simulation: Hold through Ex-Date vs Pre-Cum Capital Gain Exit vs Post-Ex Rebuy
-            </span>
-          </div>
-
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-            gap: '1rem',
-          }}>
-            {/* Strategy A */}
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.03)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '12px',
-              padding: '1.25rem',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#f8fafc' }}>Strategy A: Naive Hold</span>
-                <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>Collects Div</span>
-              </div>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.35rem 0 0.75rem' }}>
-                Hold through Ex-Date, pay 10% dividend tax, suffer Ex-Date drop.
-              </p>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: (metrics.strategy_a_naive_hold?.total_return_pct ?? 0) >= 0 ? '#10b981' : '#ef4444' }}>
-                {metrics.strategy_a_naive_hold?.total_return_pct !== undefined ? `${metrics.strategy_a_naive_hold.total_return_pct > 0 ? '+' : ''}${metrics.strategy_a_naive_hold.total_return_pct}%` : '—'}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginTop: '0.5rem', color: 'var(--text-secondary)' }}>
-                <span>Win Rate: {metrics.strategy_a_naive_hold?.win_rate_pct ?? '—'}%</span>
-                <span>Max DD: -{Math.abs(metrics.strategy_a_naive_hold?.max_drawdown_pct ?? 0)}%</span>
-              </div>
-            </div>
-
-            {/* Strategy B */}
-            <div style={{
-              background: 'rgba(56, 189, 248, 0.04)',
-              border: '1px solid rgba(56, 189, 248, 0.3)',
-              borderRadius: '12px',
-              padding: '1.25rem',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#38bdf8' }}>Strategy B: Pre-Cum Exit</span>
-                <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8' }}>Capital Gain</span>
-              </div>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.35rem 0 0.75rem' }}>
-                Sell on Cum Date close, avoid Ex-Date drop & dividend tax.
-              </p>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: (metrics.strategy_b_precum_exit?.total_return_pct ?? 0) >= 0 ? '#10b981' : '#ef4444' }}>
-                {metrics.strategy_b_precum_exit?.total_return_pct !== undefined ? `${metrics.strategy_b_precum_exit.total_return_pct > 0 ? '+' : ''}${metrics.strategy_b_precum_exit.total_return_pct}%` : '—'}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginTop: '0.5rem', color: 'var(--text-secondary)' }}>
-                <span>Win Rate: {metrics.strategy_b_precum_exit?.win_rate_pct ?? '—'}%</span>
-                <span>Max DD: -{Math.abs(metrics.strategy_b_precum_exit?.max_drawdown_pct ?? 0)}%</span>
-              </div>
-            </div>
-
-            {/* Strategy C */}
-            <div style={{
-              background: 'rgba(16, 185, 129, 0.04)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              borderRadius: '12px',
-              padding: '1.25rem',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#34d399' }}>Strategy C: Post-Ex Rebuy</span>
-                <span style={{ fontSize: '0.7rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.2)', color: '#34d399' }}>Dip Rebuy</span>
-              </div>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.35rem 0 0.75rem' }}>
-                Enter 2 days after Ex-Date after panic settles, hold 10 sessions.
-              </p>
-              <div style={{ fontSize: '1.5rem', fontWeight: 800, color: (metrics.strategy_c_postex_rebuy?.total_return_pct ?? 0) >= 0 ? '#10b981' : '#ef4444' }}>
-                {metrics.strategy_c_postex_rebuy?.total_return_pct !== undefined ? `${metrics.strategy_c_postex_rebuy.total_return_pct > 0 ? '+' : ''}${metrics.strategy_c_postex_rebuy.total_return_pct}%` : '—'}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginTop: '0.5rem', color: 'var(--text-secondary)' }}>
-                <span>Win Rate: {metrics.strategy_c_postex_rebuy?.win_rate_pct ?? '—'}%</span>
-                <span>Max DD: -{Math.abs(metrics.strategy_c_postex_rebuy?.max_drawdown_pct ?? 0)}%</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Main Equity Curve & Trades */}
-      <div style={{
-        background: 'rgba(15, 23, 42, 0.55)',
-        backdropFilter: 'blur(16px)',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        borderRadius: '16px',
-        padding: '1.5rem',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700 }}>Portfolio Equity Curve (Base 100)</h3>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              Equal-weight basket return by exit session
-              {metrics?.holding_days != null ? ` · holding ${metrics.holding_days} sessions` : ''}
-            </span>
-          </div>
-        </div>
-
+        }}
+      >
+        <h3 style={{ margin: '0 0 0.35rem', fontSize: '1.15rem', fontWeight: 700 }}>
+          Portfolio Equity Curve (Base 100)
+        </h3>
+        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+          Equal-weight by exit session
+          {metrics?.holding_days != null ? ` · holding ${metrics.holding_days} sessions` : ''}
+        </span>
         {result && (!result.equity_curve || result.equity_curve.length === 0) ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
             No equity curve — zero trades in this run.
@@ -507,98 +550,72 @@ export const BacktesterTab: React.FC<BacktesterTabProps> = ({ onSelectStock }) =
         ) : (
           <div
             ref={chartContainerRef}
-            style={{ width: '100%', height: '360px', position: 'relative', borderRadius: '8px', overflow: 'hidden' }}
+            style={{ width: '100%', height: '360px', marginTop: '0.75rem', borderRadius: '8px', overflow: 'hidden' }}
           />
         )}
       </div>
 
-      {/* Simulated Trades Table */}
       {result && totalTrades === 0 && (
-        <div style={{
-          background: 'rgba(15, 23, 42, 0.55)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          borderRadius: '16px',
-          padding: '1.5rem',
-          color: 'var(--text-secondary)',
-          fontSize: '0.9rem',
-        }}>
+        <div
+          style={{
+            background: 'rgba(15, 23, 42, 0.55)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '16px',
+            padding: '1.5rem',
+            color: 'var(--text-secondary)',
+            fontSize: '0.9rem',
+          }}
+        >
           No simulated trades for this parameter set.
         </div>
       )}
 
       {result && result.trades && result.trades.length > 0 && (
-        <div style={{
-          background: 'rgba(15, 23, 42, 0.55)',
-          backdropFilter: 'blur(16px)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          borderRadius: '16px',
-          padding: '1.5rem',
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div>
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700 }}>
-                Simulated Trades Log ({totalTrades}
-                {tradesShown < totalTrades ? ` · showing ${tradesShown} recent` : ''})
-              </h3>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                Showing up to 50 recent executions
-              </span>
-            </div>
-            <button
-              onClick={exportTradesCSV}
-              className="filter-btn"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.45rem 0.9rem',
-                fontSize: '0.8rem',
-                cursor: 'pointer',
-                background: 'rgba(56, 189, 248, 0.1)',
-                border: '1px solid rgba(56, 189, 248, 0.3)',
-                color: '#38bdf8',
-                borderRadius: '8px',
-                fontWeight: 600,
-              }}
-            >
-              <Download size={15} />
-              <span>Export Trades CSV</span>
-            </button>
-          </div>
+        <div
+          style={{
+            background: 'rgba(15, 23, 42, 0.55)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '16px',
+            padding: '1.5rem',
+          }}
+        >
+          <h3 style={{ margin: '0 0 1rem', fontSize: '1.05rem' }}>
+            Trades ({tradesShown}
+            {totalTrades > tradesShown ? ` of ${totalTrades}` : ''})
+          </h3>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                  <th style={{ padding: '0.75rem 0.5rem' }}>Ticker</th>
-                  <th style={{ padding: '0.75rem 0.5rem' }}>Entry Date</th>
-                  <th style={{ padding: '0.75rem 0.5rem' }}>Exit Date</th>
-                  <th style={{ padding: '0.75rem 0.5rem' }}>Entry Price</th>
-                  <th style={{ padding: '0.75rem 0.5rem' }}>Exit Price</th>
-                  <th style={{ padding: '0.75rem 0.5rem' }}>Weight</th>
-                  <th style={{ padding: '0.75rem 0.5rem', textAlign: 'right' }}>Return (%)</th>
+                <tr style={{ color: '#94a3b8', textAlign: 'left' }}>
+                  {['Entry', 'Exit', 'Ticker', 'Entry Px', 'Exit Px', 'Return %'].map((h) => (
+                    <th key={h} style={{ padding: '0.45rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {result.trades.slice(0, 50).map((t, idx) => (
-                  <tr
-                    key={`${t.StockCode}-${t.EntryDate}-${idx}`}
-                    onClick={() => onSelectStock(t.StockCode)}
-                    style={{
-                      borderBottom: '1px solid rgba(255, 255, 255, 0.04)',
-                      cursor: 'pointer',
-                    }}
-                    className="table-row-hover"
-                  >
-                    <td style={{ padding: '0.75rem 0.5rem', fontWeight: 700, color: '#38bdf8' }}>{t.StockCode}</td>
-                    <td style={{ padding: '0.75rem 0.5rem', color: 'var(--text-secondary)' }}>{t.EntryDate}</td>
-                    <td style={{ padding: '0.75rem 0.5rem', color: 'var(--text-secondary)' }}>{t.ExitDate}</td>
-                    <td style={{ padding: '0.75rem 0.5rem' }}>Rp {Number(t.EntryPrice).toLocaleString()}</td>
-                    <td style={{ padding: '0.75rem 0.5rem' }}>Rp {Number(t.ExitPrice).toLocaleString()}</td>
-                    <td style={{ padding: '0.75rem 0.5rem', color: 'var(--text-secondary)' }}>
-                      {t.Weight !== undefined ? `${(t.Weight * 100).toFixed(1)}%` : '—'}
+                {result.trades.map((t, i) => (
+                  <tr key={`${t.StockCode}-${t.EntryDate}-${i}`}>
+                    <td style={{ padding: '0.4rem' }}>{t.EntryDate}</td>
+                    <td style={{ padding: '0.4rem' }}>{t.ExitDate}</td>
+                    <td
+                      style={{ padding: '0.4rem', fontFamily: 'monospace', cursor: 'pointer', color: '#38bdf8' }}
+                      onClick={() => onSelectStock(t.StockCode)}
+                    >
+                      {t.StockCode}
                     </td>
-                    <td style={{ padding: '0.75rem 0.5rem', textAlign: 'right', fontWeight: 700, color: t.ReturnPct >= 0 ? '#10b981' : '#ef4444' }}>
-                      {t.ReturnPct >= 0 ? `+${t.ReturnPct}%` : `${t.ReturnPct}%`}
+                    <td style={{ padding: '0.4rem', fontFamily: 'monospace' }}>{t.EntryPrice}</td>
+                    <td style={{ padding: '0.4rem', fontFamily: 'monospace' }}>{t.ExitPrice}</td>
+                    <td
+                      style={{
+                        padding: '0.4rem',
+                        fontFamily: 'monospace',
+                        color: t.ReturnPct >= 0 ? '#34d399' : '#f87171',
+                      }}
+                    >
+                      {t.ReturnPct > 0 ? '+' : ''}
+                      {t.ReturnPct}%
                     </td>
                   </tr>
                 ))}

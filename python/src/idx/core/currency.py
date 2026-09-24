@@ -24,7 +24,7 @@ from __future__ import annotations
 import json
 import os
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from idx.core.utils import DATA_DIR, get_logger
@@ -54,7 +54,7 @@ def open_er_api_allowed() -> bool:
 
 
 def _utc() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _normalize_origin(raw: str | None) -> str:
@@ -98,8 +98,12 @@ def _quote(
     return {
         "rate": None if rate is None else float(rate),
         "status": status,
-        "source": status if status in ("default_constant", "unavailable") else (
-            f"{status}:{_normalize_origin(origin)}" if status in ("cached", "stale_cache") else origin
+        "source": status
+        if status in ("default_constant", "unavailable")
+        else (
+            f"{status}:{_normalize_origin(origin)}"
+            if status in ("cached", "stale_cache")
+            else origin
         ),
         "origin": _normalize_origin(origin),
         "quality": quality,
@@ -286,13 +290,17 @@ def resolve_usd_idr_quote(
                 cache_age_hours=round(age / 3600.0, 3),
             )
 
-    if force_refresh or not cached or (
-        cached and (now - float(cached.get("timestamp") or 0)) >= cache_ttl_seconds
+    if (
+        force_refresh
+        or not cached
+        or (cached and (now - float(cached.get("timestamp") or 0)) >= cache_ttl_seconds)
     ):
         if live_ok:
             live = _fetch_live_quote()
             if live is not None and live.get("rate") is not None:
-                _save_cached_rate(float(live["rate"]), origin=str(live.get("origin") or live["source"]))
+                _save_cached_rate(
+                    float(live["rate"]), origin=str(live.get("origin") or live["source"])
+                )
                 return live
         elif force_refresh:
             log.info(
@@ -339,8 +347,7 @@ def resolve_usd_idr_quote(
         )
 
     log.warning(
-        "No USD/IDR rate available; using default constant %.2f "
-        "(NOT a live/verified market quote)",
+        "No USD/IDR rate available; using default constant %.2f (NOT a live/verified market quote)",
         default_rate,
     )
     return _quote(
@@ -384,9 +391,7 @@ def fx_status() -> dict[str, Any]:
     return {
         "provider": "fx_usd_idr",
         "status": (
-            "PARTIAL"
-            if cached or yahoo_fx_allowed() or open_er_api_allowed()
-            else "NOT_CONFIGURED"
+            "PARTIAL" if cached or yahoo_fx_allowed() or open_er_api_allowed() else "NOT_CONFIGURED"
         ),
         "configured_live": yahoo_fx_allowed() or open_er_api_allowed(),
         "yahoo_allowed": yahoo_fx_allowed(),

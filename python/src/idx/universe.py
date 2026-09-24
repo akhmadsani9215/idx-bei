@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pandas as pd
@@ -19,7 +19,7 @@ def discover_universe(
     base_dir: str | None = None,
 ) -> dict[str, Any]:
     """Return sorted unique tickers from local OHLC — never from network_alpha."""
-    calculated_at = datetime.now(timezone.utc).isoformat()
+    calculated_at = datetime.now(UTC).isoformat()
     tickers: list[str] = []
     source = "injected_frame"
     as_of_out = as_of

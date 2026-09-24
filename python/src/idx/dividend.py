@@ -299,9 +299,7 @@ def analyze_stock_dividend(
     # Foreign flow is aggregate market data and does not identify individual brokers or participant types.
     if nff_5d < 0 and runup_20d_pct > 5.0:
         trap_score += 20.0
-        risk_factors.append(
-            "Foreign flow divergence: net foreign selling during a price run-up"
-        )
+        risk_factors.append("Foreign flow divergence: net foreign selling during a price run-up")
     elif nff_20d < 0:
         trap_score += 10.0
         risk_factors.append(

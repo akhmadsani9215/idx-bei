@@ -11,7 +11,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from idx.screener.contract import MIN_OPPORTUNITY_PCT, MIN_RR, SETUP_NOT_QUALIFIED, empty_levels
+from idx.screener.contract import MIN_RR, SETUP_NOT_QUALIFIED, empty_levels
 
 
 def idx_tick_size(price: float) -> float:
@@ -78,15 +78,15 @@ def enrich_structure(df: pd.DataFrame) -> pd.DataFrame:
 
     c = g["Close"]
     h = g["High"]
-    l = g["Low"]
+    lo = g["Low"]
     v = g["Volume"] if "Volume" in g.columns else pd.Series(np.nan, index=g.index)
 
-    tr = _true_range(h, l, c)
+    tr = _true_range(h, lo, c)
     g["ATR14"] = tr.ewm(span=14, adjust=False, min_periods=14).mean()
 
     # Prior-session structure (exclude current bar from lookback windows).
     prior_h = h.shift(1)
-    prior_l = l.shift(1)
+    prior_l = lo.shift(1)
     prior_c = c.shift(1)
 
     for n in (5, 10, 20, 50, 100, 200):
@@ -125,8 +125,8 @@ def enrich_structure(df: pd.DataFrame) -> pd.DataFrame:
         g["FOREIGN_NET"] = np.nan
         g["FOREIGN_NET_5D"] = np.nan
 
-    rng = (h - l).replace(0, np.nan)
-    g["CLOSE_LOC"] = (c - l) / rng
+    rng = (h - lo).replace(0, np.nan)
+    g["CLOSE_LOC"] = (c - lo) / rng
 
     return g
 
@@ -164,11 +164,11 @@ def _candidate_targets(row: pd.Series, entry: float) -> list[tuple[float, str]]:
     # ATR extensions only as additional structure-derived options (not fixed %).
     if atr is not None and atr > 0:
         for mult, label in ((1.5, "ATR_1.5"), (2.5, "ATR_2.5"), (3.5, "ATR_3.5")):
-            level = round_tick(entry + mult * atr)
-            if level is None or level <= entry or level in seen:
+            ext = round_tick(entry + mult * atr)
+            if ext is None or ext <= entry or ext in seen:
                 continue
-            seen.add(level)
-            candidates.append((level, label))
+            seen.add(ext)
+            candidates.append((ext, label))
 
     candidates.sort(key=lambda x: x[0])
     return candidates
@@ -204,11 +204,11 @@ def _candidate_stops(row: pd.Series, entry: float) -> list[tuple[float, str]]:
 
     if atr is not None and atr > 0:
         for mult, label in ((0.75, "ATR_0.75"), (1.25, "ATR_1.25"), (1.75, "ATR_1.75")):
-            level = round_tick(entry - mult * atr)
-            if level is None or level >= entry or level in seen:
+            ext = round_tick(entry - mult * atr)
+            if ext is None or ext >= entry or ext in seen:
                 continue
-            seen.add(level)
-            candidates.append((level, label))
+            seen.add(ext)
+            candidates.append((ext, label))
 
     # Prefer tighter (higher) stops first for CL1, then deeper.
     candidates.sort(key=lambda x: -x[0])
@@ -300,13 +300,16 @@ def select_dynamic_levels(
 
 def classify_lifecycle(row: pd.Series) -> str:
     """Dormant → Active progression from available daily features."""
-    required = ("RVOL", "CLOSE_LOC", "ATR14", "Close")
-    if any(k not in row.index or pd.isna(row.get(k)) for k in ("Close",)):
+    if "Close" not in row.index or pd.isna(row.get("Close")):
         return "UNAVAILABLE"
 
     rvol = float(row["RVOL"]) if "RVOL" in row.index and pd.notna(row["RVOL"]) else None
-    close_loc = float(row["CLOSE_LOC"]) if "CLOSE_LOC" in row.index and pd.notna(row["CLOSE_LOC"]) else None
-    high_20 = float(row["HIGH_20D"]) if "HIGH_20D" in row.index and pd.notna(row["HIGH_20D"]) else None
+    close_loc = (
+        float(row["CLOSE_LOC"]) if "CLOSE_LOC" in row.index and pd.notna(row["CLOSE_LOC"]) else None
+    )
+    high_20 = (
+        float(row["HIGH_20D"]) if "HIGH_20D" in row.index and pd.notna(row["HIGH_20D"]) else None
+    )
     low_20 = float(row["LOW_20D"]) if "LOW_20D" in row.index and pd.notna(row["LOW_20D"]) else None
     close = float(row["Close"])
     foreign_5 = (
@@ -336,8 +339,10 @@ def classify_lifecycle(row: pd.Series) -> str:
 
     foreign_acc = foreign_5 is not None and foreign_5 > 0
     tight = range_pct is not None and range_pct < 10
-    if (1.0 <= rvol < 1.8) and (tight or (close_loc is not None and close_loc >= 0.55)) and (
-        foreign_acc or close_loc is not None
+    if (
+        (1.0 <= rvol < 1.8)
+        and (tight or (close_loc is not None and close_loc >= 0.55))
+        and (foreign_acc or close_loc is not None)
     ):
         return "ACCUMULATION"
 
@@ -357,10 +362,14 @@ def detect_swing_setup(row: pd.Series) -> str | None:
 
     close = float(row["Close"])
     rvol = float(row["RVOL"]) if "RVOL" in row.index and pd.notna(row["RVOL"]) else None
-    close_loc = float(row["CLOSE_LOC"]) if "CLOSE_LOC" in row.index and pd.notna(row["CLOSE_LOC"]) else None
+    close_loc = (
+        float(row["CLOSE_LOC"]) if "CLOSE_LOC" in row.index and pd.notna(row["CLOSE_LOC"]) else None
+    )
     sma20 = float(row["SMA20"]) if "SMA20" in row.index and pd.notna(row["SMA20"]) else None
     sma50 = float(row["SMA50"]) if "SMA50" in row.index and pd.notna(row["SMA50"]) else None
-    high_20 = float(row["HIGH_20D"]) if "HIGH_20D" in row.index and pd.notna(row["HIGH_20D"]) else None
+    high_20 = (
+        float(row["HIGH_20D"]) if "HIGH_20D" in row.index and pd.notna(row["HIGH_20D"]) else None
+    )
     low_20 = float(row["LOW_20D"]) if "LOW_20D" in row.index and pd.notna(row["LOW_20D"]) else None
     foreign_5 = (
         float(row["FOREIGN_NET_5D"])
@@ -377,16 +386,16 @@ def detect_swing_setup(row: pd.Series) -> str | None:
 
     if uptrend and low_20 is not None and atr is not None and atr > 0:
         dist = (close - low_20) / atr
-        if dist <= 6 and rvol is not None and rvol >= 0.8 and close_loc is not None and close_loc >= 0.45:
+        if (
+            dist <= 6
+            and rvol is not None
+            and rvol >= 0.8
+            and close_loc is not None
+            and close_loc >= 0.45
+        ):
             return "pullback"
 
-    if (
-        uptrend
-        and rvol is not None
-        and rvol >= 1.3
-        and close_loc is not None
-        and close_loc >= 0.65
-    ):
+    if uptrend and rvol is not None and rvol >= 1.3 and close_loc is not None and close_loc >= 0.65:
         return "continuation"
 
     if (
@@ -410,10 +419,20 @@ def detect_swing_setup(row: pd.Series) -> str | None:
     ):
         return "support_bounce"
 
-    if downtrend and close_loc is not None and close_loc >= 0.6 and rvol is not None and rvol >= 1.2:
+    if (
+        downtrend
+        and close_loc is not None
+        and close_loc >= 0.6
+        and rvol is not None
+        and rvol >= 1.2
+    ):
         return "reversal"
 
-    if rvol is not None and rvol >= 1.5 and classify_lifecycle(row) in ("ACCUMULATION", "EARLY_ACTIVITY"):
+    if (
+        rvol is not None
+        and rvol >= 1.5
+        and classify_lifecycle(row) in ("ACCUMULATION", "EARLY_ACTIVITY")
+    ):
         return "accumulation"
 
     if uptrend and sma20 is not None:
@@ -431,7 +450,9 @@ def close_pressure_proxy_score(row: pd.Series) -> tuple[float | None, str | None
     score = 0.0
     parts = 0
 
-    close_loc = float(row["CLOSE_LOC"]) if "CLOSE_LOC" in row.index and pd.notna(row["CLOSE_LOC"]) else None
+    close_loc = (
+        float(row["CLOSE_LOC"]) if "CLOSE_LOC" in row.index and pd.notna(row["CLOSE_LOC"]) else None
+    )
     rvol = float(row["RVOL"]) if "RVOL" in row.index and pd.notna(row["RVOL"]) else None
     foreign_5 = (
         float(row["FOREIGN_NET_5D"])

@@ -188,10 +188,7 @@ async def async_backfill_dataset(
     have = ts.existing_dates(dataset)
     dates = list(_trading_days(start_date, end_date))
 
-    missing = [
-        dt for dt in dates
-        if dt.strftime("%Y-%m-%d") not in have
-    ]
+    missing = [dt for dt in dates if dt.strftime("%Y-%m-%d") not in have]
 
     log.info(
         "%s: %d total trading days (%d cached, %d missing)",
@@ -278,11 +275,7 @@ async def async_backfill_dataset(
                     )
                     return
 
-                records = (
-                    data.get("data")
-                    if isinstance(data, dict)
-                    else None
-                )
+                records = data.get("data") if isinstance(data, dict) else None
 
                 if isinstance(records, list) and len(records) > 0:
                     # Write only after a successful non-empty response.
@@ -318,9 +311,7 @@ async def async_backfill_dataset(
         # gather is retained so the same function remains compatible with
         # callers that intentionally request limited concurrency.
         tasks = [
-            asyncio.create_task(
-                _worker(dt, idx, len(missing))
-            )
+            asyncio.create_task(_worker(dt, idx, len(missing)))
             for idx, dt in enumerate(missing, start=1)
         ]
 
@@ -353,6 +344,7 @@ async def async_backfill_dataset(
     ) as async_client:
         return await run(async_client)
 
+
 async def async_backfill_stock_summary(start_date, end_date, concurrency=1, delay=5.0, client=None):
     """Async backfill for stock OHLCV summaries."""
     return await async_backfill_dataset(
@@ -366,7 +358,9 @@ async def async_backfill_stock_summary(start_date, end_date, concurrency=1, dela
     )
 
 
-async def async_backfill_broker_summary(start_date, end_date, concurrency=1, delay=5.0, client=None):
+async def async_backfill_broker_summary(
+    start_date, end_date, concurrency=1, delay=5.0, client=None
+):
     """Async backfill for broker transaction summaries."""
     return await async_backfill_dataset(
         "broker_summary",
