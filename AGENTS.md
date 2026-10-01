@@ -71,3 +71,10 @@ Run all commands from the repository root using modern `uv`:
 - Follow **Conventional Commits** (`feat:`, `fix:`, `refactor:`, `chore:`, `ci:`, `docs:`).
 - Keep commits atomic and logically separated.
 - Mention data shape, schema impacts, or new CLI commands in the commit message.
+
+## Cursor Cloud specific instructions
+- System `python3` is 3.12 and cannot run this package. `uv` and `bun` live on `/usr/local/bin`. Always use `uv run` (Python 3.13 comes from `uv python install 3.13`).
+- From the repo root, refresh dependencies with `uv sync --frozen --all-packages --all-groups`, then `cd frontend && bun install --frozen-lockfile && bun run build`. The API serves `frontend/dist` when that directory exists, otherwise `dashboard/`.
+- Start the dashboard and API with `uv run idx serve --host 0.0.0.0 --port 8000`. Health is `GET /health`. The UI is `http://127.0.0.1:8000/dashboard/`.
+- Checked-in data covers company profiles, financial ratios, and corporate actions. Daily OHLCV under `data/timeseries/` is not in git, so screener, dividend, and backtest flows that need `stock_summary` stay empty until `uv run idx backfill`.
+- Neo4j (`docker compose up -d`) is optional. `docker-compose/neo4j.yml` requires `NEO4J_PASSWORD` and is not started by default.
